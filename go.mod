@@ -1,8 +1,9 @@
-module github.com/hashicorp/terraform-provider-scaffolding-framework
+module terraform-provider-scraping
 
 go 1.21
 
 require (
+	github.com/hashicorp-demoapp/hashicups-client-go v0.1.0
 	github.com/hashicorp/terraform-plugin-docs v0.19.4
 	github.com/hashicorp/terraform-plugin-framework v1.9.0
 	github.com/hashicorp/terraform-plugin-go v0.23.0
@@ -58,6 +59,7 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/oklog/run v1.0.0 // indirect
 	github.com/posener/complete v1.2.3 // indirect
+	github.com/sclevine/agouti v3.0.0+incompatible // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
