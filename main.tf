@@ -8,13 +8,12 @@ terraform {
 
 provider "scraping" {
     
-/*    host = "https://sso.fun.ac.jp/my.policy"
     username = "b1021204"
-    password = "EPa6ouQ2"
-    
-*/
+    password = "EPa6ouQ2"    
+
 }
 
-resource "scraping_resource" "example"{
+resource "Server_Manage_FUN_resource" "example"{
     instance_type = "a"
+    username = "b10210204"
 }

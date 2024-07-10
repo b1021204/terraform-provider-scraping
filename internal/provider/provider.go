@@ -2,10 +2,8 @@ package provider
 
 import (
 	"context"
-	//"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -21,121 +19,77 @@ var (
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
 		return &scrapingProvider{
-			version: version,
+			Version: version,
 		}
 	}
 }
 
-type scrapingProviderModel struct {
-	Host     types.String `tfsdk:"host"`
-	Username types.String `tfsdk:"username"`
-	Password types.String `tfsdk:"password"`
-}
-
-// hashicupsProvider is the provider implementation.
-type scrapingProvider struct {
-	// version is set to the provider version on release, "dev" when the
-	// provider is built and ran locally, and "test" when running acceptance
-	// testing.
-	version string
-}
-
 // Metadata returns the provider type name.
 func (p *scrapingProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "scraping"
-	resp.Version = p.version
+	resp.TypeName = "Server_Manage_FUN"
+}
+
+type scrapingProvider struct {
+	Version string
+}
+
+type scrapingProviderModel struct {
+	Username types.String `tfsdk:"username`
+	Password types.String `tfsdk:"password`
 }
 
 // Schema defines the provider-level schema for configuration data.
 func (p *scrapingProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-        Attributes: map[string]schema.Attribute{
-				"host": schema.StringAttribute{
-					Optional: true,
-				},
-				"username": schema.StringAttribute{
-					Optional: true,
-				},
-				"password": schema.StringAttribute{
-					Optional: true,
-				},
+		Attributes: map[string]schema.Attribute{
+			"username": schema.StringAttribute{
+				Optional: true,
 			},
-    }
+			"password": schema.StringAttribute{
+				Optional: true,
+			},
+		},
+	}
 }
 
 // Configure prepares a HashiCups API client for data sources and resources.
 func (p *scrapingProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	// Retrieve provider data from configuration
-	var config scrapingProviderModel
-	diags := req.Config.Get(ctx, &config)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 
-	if config.Host.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("host"),
-			"Unknown HashiCups API Host",
-			"The provider cannot create the HashiCups API client as there is an unknown configuration value for the HashiCups API host. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the HASHICUPS_HOST environment variable.",
-		)
-	}
+	var data scrapingProviderModel
+	var username, password string
 
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	// Read configutation data into model
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+
 	/*
-
-	host := os.Getenv("host")
-	username := os.Getenv("username")
-	password := os.Getenv("password")
-	if !config.Host.IsNull() {
-		host = config.Host.ValueString()
+		Check configure data. which should take precedence over
+		enviroment variable data, if found
+	*/
+	if data.Username.ValueString() != "" {
+		username = data.Username.ValueString()
 	}
 
-	if !config.Username.IsNull() {
-		username = config.Username.ValueString()
-	}
-
-	if !config.Password.IsNull() {
-		password = config.Password.ValueString()
-	}
-
-	if host == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("host"),
-			"Missing HashiCups API Host",
-			"The provider cannot create the HashiCups API client as there is a missing or empty value for the HashiCups API host. "+
-				"Set the host value in the configuration or use the HASHICUPS_HOST environment variable. "+
-				"If either is already set, ensure the value is not empty.",
-		)
+	if data.Password.ValueString() != "" {
+		password = data.Password.ValueString()
 	}
 
 	if username == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("username"),
-			"Missing HashiCups API Username",
-			"The provider cannot create the HashiCups API client as there is a missing or empty value for the HashiCups API username. "+
-				"Set the username value in the configuration or use the HASHICUPS_USERNAME environment variable. "+
-				"If either is already set, ensure the value is not empty.",
+		resp.Diagnostics.AddError(
+			"Missing username Configuration",
+			"While configuring the provider, the username was not found in "+
+				"configuration block api_token attribute.",
 		)
 	}
 
 	if password == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("password"),
-			"Missing HashiCups API Password",
-			"The provider cannot create the HashiCups API client as there is a missing or empty value for the HashiCups API password. "+
-				"Set the password value in the configuration or use the HASHICUPS_PASSWORD environment variable. "+
-				"If either is already set, ensure the value is not empty.",
+		resp.Diagnostics.AddError(
+			"Missing password Configuration",
+			"While configuring the provider, the password was not found in "+
+				"configuration block api_token attribute.",
 		)
-	}
-
-	if resp.Diagnostics.HasError() {
 		return
 	}
-		*/
+
 }
 
 // DataSources defines the data sources implemented in the provider.

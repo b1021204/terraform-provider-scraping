@@ -7,7 +7,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	//"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -26,8 +25,8 @@ type VMResource struct {
 
 // ExampleResourceModel describes the resource data model.
 type VMResourceModel struct {
-	instance_type types.String `tfsdk:"instance_type"`
-
+	instance_type string
+	username      string
 }
 
 func (r *VMResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -44,6 +43,11 @@ func (r *VMResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				MarkdownDescription: "Example configurable attribute",
 				Optional:            true,
 			},
+			/*"username": {
+				Type:     string,
+				Required: true,
+				ForceNew: true,
+			},*/
 		},
 	}
 }
@@ -69,8 +73,14 @@ func (r *VMResource) Configure(ctx context.Context, req resource.ConfigureReques
 }
 
 func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	
-	create_vm("b1021204", "EPa6ouQ2")
+	var data VMResourceModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	create_vm(data.username, "EPa6ouQ2")
 	return
 }
 
