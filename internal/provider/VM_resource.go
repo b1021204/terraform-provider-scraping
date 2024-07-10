@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -25,8 +26,9 @@ type VMResource struct {
 
 // ExampleResourceModel describes the resource data model.
 type VMResourceModel struct {
-	instance_type string
-	username      string
+	Instance_type types.String `tfsdk:"instance_type"`
+	Username      types.String `tfsdk:"username"`
+	Password      types.String `tfsdk:"password"`
 }
 
 func (r *VMResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -43,11 +45,13 @@ func (r *VMResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				MarkdownDescription: "Example configurable attribute",
 				Optional:            true,
 			},
-			/*"username": {
-				Type:     string,
-				Required: true,
-				ForceNew: true,
-			},*/
+			"username": schema.StringAttribute{
+				Optional: true,
+			},
+			"password": schema.StringAttribute{
+				Optional:  true,
+				Sensitive: true,
+			},
 		},
 	}
 }
@@ -74,13 +78,18 @@ func (r *VMResource) Configure(ctx context.Context, req resource.ConfigureReques
 
 func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data VMResourceModel
+	username := "default"
+	password := "default"
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	create_vm(data.username, "EPa6ouQ2")
+	username = data.Username.ValueString()
+	password = data.Password.ValueString()
+
+	create_vm(username, password)
 	return
 }
 

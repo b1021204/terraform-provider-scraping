@@ -7,13 +7,14 @@ terraform {
 }
 
 provider "scraping" {
-    
-    username = "b1021204"
-    password = "EPa6ouQ2"    
+   
 
 }
 
-resource "Server_Manage_FUN_resource" "example"{
+resource "scraping_resource" "example"{
     instance_type = "a"
-    username = "b10210204"
+        
+    username = "b1021204"
+    password = "EPa6ouQ2" 
+
 }

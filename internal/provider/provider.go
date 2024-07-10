@@ -19,23 +19,24 @@ var (
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
 		return &scrapingProvider{
-			Version: version,
+			version: version,
 		}
 	}
 }
 
 // Metadata returns the provider type name.
 func (p *scrapingProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "Server_Manage_FUN"
+	resp.TypeName = "scraping"
+	resp.Version = p.version
 }
 
 type scrapingProvider struct {
-	Version string
+	version string
 }
 
 type scrapingProviderModel struct {
-	Username types.String `tfsdk:"username`
-	Password types.String `tfsdk:"password`
+	Username types.String `tfsdk:"username"`
+	Password types.String `tfsdk:"password"`
 }
 
 // Schema defines the provider-level schema for configuration data.
@@ -46,7 +47,8 @@ func (p *scrapingProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Optional: true,
 			},
 			"password": schema.StringAttribute{
-				Optional: true,
+				Optional:  true,
+				Sensitive: true,
 			},
 		},
 	}
@@ -56,8 +58,8 @@ func (p *scrapingProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 func (p *scrapingProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 
 	var data scrapingProviderModel
-	var username, password string
-
+	username := "gwoo"
+	password := "joejg"
 	// Read configutation data into model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
@@ -77,7 +79,7 @@ func (p *scrapingProvider) Configure(ctx context.Context, req provider.Configure
 		resp.Diagnostics.AddError(
 			"Missing username Configuration",
 			"While configuring the provider, the username was not found in "+
-				"configuration block api_token attribute.",
+				"configuration block username attribute.",
 		)
 	}
 
@@ -85,7 +87,7 @@ func (p *scrapingProvider) Configure(ctx context.Context, req provider.Configure
 		resp.Diagnostics.AddError(
 			"Missing password Configuration",
 			"While configuring the provider, the password was not found in "+
-				"configuration block api_token attribute.",
+				"configuration block password attribute.",
 		)
 		return
 	}
