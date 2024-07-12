@@ -29,6 +29,7 @@ type VMResourceModel struct {
 	Instance_type types.String `tfsdk:"instance_type"`
 	Username      types.String `tfsdk:"username"`
 	Password      types.String `tfsdk:"password"`
+	Machine_name  types.String `tfsdk:"machine_name"`
 }
 
 func (r *VMResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -51,6 +52,9 @@ func (r *VMResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			"password": schema.StringAttribute{
 				Optional:  true,
 				Sensitive: true,
+			},
+			"machine_name": schema.StringAttribute{
+				Optional: true,
 			},
 		},
 	}
@@ -80,6 +84,7 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 	var data VMResourceModel
 	username := "default"
 	password := "default"
+	machine_name := ""
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -88,9 +93,16 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 
 	username = data.Username.ValueString()
 	password = data.Password.ValueString()
+	machine_name = data.Machine_name.ValueString()
 
-	create_vm(username, password)
-	return
+	// machine名が入力されていれば起動、なければ作成
+	if machine_name == "" {
+		create_vm(username, password)
+	} else {
+		start_vm(username, password, machine_name)
+	}
+
+	//resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *VMResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {

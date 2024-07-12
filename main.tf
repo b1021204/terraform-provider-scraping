@@ -16,5 +16,6 @@ resource "scraping_resource" "example"{
         
     username = "b1021204"
     password = "EPa6ouQ2" 
+    machine_name = "EC2-geotail-147189"
 
 }

@@ -1,4 +1,4 @@
-package main
+package provider
 
 import (
 	//"fmt"
@@ -63,11 +63,12 @@ func start_vm(username string, password string, machine_name string) {
 
 }
 
+/*
 func main() {
 	username := "b1021204"
 	password := "EPa6ouQ2"
 	machine_name := "EC2-geotail-153025"
-	//login(username, password)
 	start_vm(username, password, machine_name)
 
 }
+*/
