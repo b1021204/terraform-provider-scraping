@@ -45,7 +45,9 @@ func delete_vm(username string, password string, machine_name string) {
 
 		// web上からterraformに指定されたmachine_nameと合致するものを探す
 		if text, err := instance_name.Text(); err == nil {
+			log.Printf("\n\n\n\n%s\n%s", text, machine_name)
 			if text == machine_name {
+				log.Printf("get machine_name!!\n\n\n\n%s", text)
 				if err := page.FindByName("deleteBtn_" + strconv.Itoa(i)).Click(); err != nil {
 					log.Fatalf("Failed to delete;%v", err)
 					return
@@ -55,6 +57,8 @@ func delete_vm(username string, password string, machine_name string) {
 					return
 				}
 				return
+			} else {
+				log.Printf("ううううううおあおあおあお\n\nましんめいみつからないようおOOOoooooo\n\n\n")
 			}
 		}
 

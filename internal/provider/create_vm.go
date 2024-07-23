@@ -3,13 +3,20 @@ package provider
 import (
 	"github.com/sclevine/agouti"
 	"log"
+	"os"
 	"strconv"
 	"time"
 )
 
-func create_vm(username string, password string, machine_name string) string {
+func create_vm(username string, password string, machine_name string) {
 	// ブラウザはChromeを指定して起動
-	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
+	driver := agouti.ChromeDriver(
+		agouti.ChromeOptions(
+			"args", []string{
+				"--headless",
+				"--disavle-gpu",
+			}),
+	)
 	log.Printf("Open Google Chorome...")
 
 	if err := driver.Start(); err != nil {
@@ -33,45 +40,62 @@ func create_vm(username string, password string, machine_name string) string {
 	// Submit
 	if err := page.FindByClass("credentials_input_submit").Click(); err != nil {
 		log.Fatalf("Failed to login:%v", err)
-		return ""
+		return
 	}
 	log.Printf("Success to login FUN VM WebAPI!!")
 
 	time.Sleep(1 * time.Second)
 	if err := page.FindByXPath("/html/body/div/div/main/div/form/div[2]/div/span").Click(); err != nil {
 		log.Fatalf("Failed to choice:%v", err)
-		return ""
+		return
 	}
 	time.Sleep(1 * time.Second)
 	if err := page.FindByName("createBtn").Click(); err != nil {
 		log.Fatalf("Failed to create;%v", err)
-		return ""
+		return
 	}
 	log.Printf("Now Creating...")
 
 	if err := page.FindByXPath("/html/body/form/div/div[5]/div/div/div[3]/button[1]").Click(); err != nil {
 		log.Fatalf("dismiss to create:%v", err)
-		return ""
+		return
 	}
 
 	log.Printf("Success to create new machine!!")
 	log.Printf("Save new machine_name...")
 	time.Sleep(2 * time.Second)
-	for i := 0; i < 20; i++ {
-		if name, err := page.FindByID("INSTANCE_NAME_" + strconv.Itoa(i)).Text(); err != nil {
+
+	for i := 20; i > 0; i-- {
+		if name, err := page.FindByID("INSTANCE_NAME_" + strconv.Itoa(i)).Text(); err == nil {
 			// 作成したマシンの名前を保存する
 			//machine_name = text
-			name, err = page.FindByID("INSTANCE_NAME_" + strconv.Itoa(i-1)).Text()
-			log.Printf("machine_name = %v", name)
+			name, err = page.FindByID("INSTANCE_NAME_" + strconv.Itoa(i)).Text()
+			if err == nil {
+				log.Printf("machine_name = " + name)
 
-			return name
+				f, err := os.Create(".machine_name.txt")
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer f.Close()
 
-		} else {
-			log.Fatalf("Failed to save machine_name;%v", err)
-			return ""
+				d := []byte(name)
+
+				_, err = f.Write(d)
+				if err != nil {
+					log.Fatal(err)
+				}
+				log.Printf("save new machine_name! machine_name is %v", name)
+
+				return
+
+			} else {
+				log.Fatalf("Failed to save machine_name;%v", err)
+				return
+			}
+
 		}
 	}
-	return ""
 }
 
 /*

@@ -21,11 +21,11 @@ resource "scraping_resource" "example"{
 }
 */
 resource "scraping_resource" "example2"{
-    instance_type = "a"
+    environment = "Linux(Ubuntu22.04LTS)(2024前期)"
         
     username = "b1021204"
     password = "EPa6ouQ2" 
-    machine_name = "EC2-geotail-145039"
+    machine_name = ""
 
 }
 

@@ -7,6 +7,7 @@ import (
 	//"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 
@@ -109,8 +110,7 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 	// machine名が入力されていれば起動、なければ作成
 	if machine_name == "" {
 		create_vm(username, password, machine_name)
-		data.Machine_name = types.StringValue(machine_name)
-		log.Printf("Save machine_name")
+		//log.Printf("Save machine_name")
 	} else {
 		start_vm(username, password, machine_name)
 	}
@@ -157,6 +157,37 @@ func (r *VMResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 	password = data.Password.ValueString()
 	machine_name = data.Machine_name.ValueString()
 
+	if machine_name == "" {
+		f, err := os.Open(".machine_name.txt")
+		if err != nil {
+			fmt.Println("Can't get machine_name. You should confirm the file which named \".machine_name.txt\" .")
+		}
+		defer f.Close()
+
+		buf := make([]byte, 1024)
+		n, err := f.Read(buf)
+		if err != nil {
+			fmt.Printf("error! You should confirm the file which named \".machine_name.txt\" .")
+		}
+
+		machine_name = string(buf[:n])
+		log.Printf("%s", machine_name)
+		//delete_vm(username, password, machine_name)
+
+	}
+	log.Printf("うおおおおおおおおおお%s\n\n\n\n\n", machine_name)
+	//result1 := []rune(machine_name)
+	//	result2 := []rune("EC2-geotail-144223")
+	/*
+		for i := 0; ; i++ {
+			if result1[i] == result2[i] {
+				log.Printf("一緒やで%q", result1)
+			} else {
+				log.Printf("ちがうやん%q", result2)
+				return
+			}
+		}
+	*/
 	delete_vm(username, password, machine_name)
 }
 
