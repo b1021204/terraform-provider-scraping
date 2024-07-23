@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	//"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"log"
 	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	//"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -26,10 +29,10 @@ type VMResource struct {
 
 // ExampleResourceModel describes the resource data model.
 type VMResourceModel struct {
-	Instance_type types.String `tfsdk:"instance_type"`
-	Username      types.String `tfsdk:"username"`
-	Password      types.String `tfsdk:"password"`
-	Machine_name  types.String `tfsdk:"machine_name"`
+	Environment  types.String `tfsdk:"environment"`
+	Username     types.String `tfsdk:"username"`
+	Password     types.String `tfsdk:"password"`
+	Machine_name types.String `tfsdk:"machine_name"`
 }
 
 func (r *VMResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -42,7 +45,7 @@ func (r *VMResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 		MarkdownDescription: "Example resource",
 
 		Attributes: map[string]schema.Attribute{
-			"instance_type": schema.StringAttribute{
+			"environment": schema.StringAttribute{
 				MarkdownDescription: "Example configurable attribute",
 				Optional:            true,
 			},
@@ -94,26 +97,73 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 	username = data.Username.ValueString()
 	password = data.Password.ValueString()
 	machine_name = data.Machine_name.ValueString()
+	ctx = tflog.SetField(ctx, "username", username)
+	ctx = tflog.SetField(ctx, "password", password)
+	if machine_name == "" {
+		log.Printf("machine_name is null." +
+			"We will create new machine. If you want to stand-up machine which already created, you should put name in machine_name")
+	} else {
+		ctx = tflog.SetField(ctx, "machine_name", machine_name)
+	}
 
 	// machine名が入力されていれば起動、なければ作成
 	if machine_name == "" {
-		create_vm(username, password)
+		create_vm(username, password, machine_name)
+		data.Machine_name = types.StringValue(machine_name)
+		log.Printf("Save machine_name")
 	} else {
 		start_vm(username, password, machine_name)
 	}
 
-	//resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	log.Printf("Compleate!!!")
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *VMResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var data VMResourceModel
+	username := "default"
+	password := "default"
+	machine_name := ""
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	username = data.Username.ValueString()
+	password = data.Password.ValueString()
+	machine_name = data.Machine_name.ValueString()
+
+	// machine名が入力されていれば起動、なければ作成
+	if machine_name == "" {
+		create_vm(username, password, machine_name)
+		data.Machine_name = types.StringValue(machine_name)
+	} else {
+		start_vm(username, password, machine_name)
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *VMResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data VMResourceModel
+
+	// Read Terraorm prior state data into the model
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+
+	// Convert from Terraform data model into strings
+	var username, password, machine_name string
+	username = data.Username.ValueString()
+	password = data.Password.ValueString()
+	machine_name = data.Machine_name.ValueString()
+
+	delete_vm(username, password, machine_name)
 }
 
 func (r *VMResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	return
+
 }
 
 func (r *VMResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+
 }

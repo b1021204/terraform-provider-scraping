@@ -10,7 +10,7 @@ provider "scraping" {
    
 
 }
-
+/*
 resource "scraping_resource" "example"{
     instance_type = "a"
         
@@ -18,4 +18,17 @@ resource "scraping_resource" "example"{
     password = "EPa6ouQ2" 
     machine_name = "EC2-geotail-147189"
 
+}
+*/
+resource "scraping_resource" "example2"{
+    instance_type = "a"
+        
+    username = "b1021204"
+    password = "EPa6ouQ2" 
+    machine_name = "EC2-geotail-145039"
+
+}
+
+output "name" {
+    value = scraping_resource.example2.machine_name
 }
