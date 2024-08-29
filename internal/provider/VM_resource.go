@@ -34,6 +34,7 @@ type VMResourceModel struct {
 	Username     types.String `tfsdk:"username"`
 	Password     types.String `tfsdk:"password"`
 	Machine_name types.String `tfsdk:"machine_name"`
+	Machine_stop types.Bool   `tfsdk:"machine_stop"`
 }
 
 func (r *VMResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -58,6 +59,10 @@ func (r *VMResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 				Sensitive: true,
 			},
 			"machine_name": schema.StringAttribute{
+				Optional: true,
+			},
+
+			"machine_stop": schema.BoolAttribute{
 				Optional: true,
 			},
 		},
@@ -85,10 +90,12 @@ func (r *VMResource) Configure(ctx context.Context, req resource.ConfigureReques
 }
 
 func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+
 	var data VMResourceModel
 	username := "default"
 	password := "default"
 	machine_name := ""
+	machine_stop := false
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -98,51 +105,40 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 	username = data.Username.ValueString()
 	password = data.Password.ValueString()
 	machine_name = data.Machine_name.ValueString()
+	machine_stop = data.Machine_stop.ValueBool()
+
 	ctx = tflog.SetField(ctx, "username", username)
 	ctx = tflog.SetField(ctx, "password", password)
+
 	if machine_name == "" {
 		log.Printf("machine_name is null." +
 			"We will create new machine. If you want to stand-up machine which already created, you should put name in machine_name")
 	} else {
 		ctx = tflog.SetField(ctx, "machine_name", machine_name)
 	}
-
 	// machine名が入力されていれば起動、なければ作成
 	if machine_name == "" {
 		create_vm(username, password, machine_name)
 		//log.Printf("Save machine_name")
 	} else {
-		start_vm(username, password, machine_name)
+
+		if machine_stop {
+			stop_vm(username, password, machine_name)
+
+		} else {
+			log.Printf("スタートしてるよーーーー")
+			start_vm(username, password, machine_name)
+		}
+
 	}
 
 	log.Printf("Compleate!!!")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+
 }
 
 func (r *VMResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data VMResourceModel
-	username := "default"
-	password := "default"
-	machine_name := ""
-
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	username = data.Username.ValueString()
-	password = data.Password.ValueString()
-	machine_name = data.Machine_name.ValueString()
-
-	// machine名が入力されていれば起動、なければ作成
-	if machine_name == "" {
-		create_vm(username, password, machine_name)
-		data.Machine_name = types.StringValue(machine_name)
-	} else {
-		start_vm(username, password, machine_name)
-	}
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	return
 }
 
 func (r *VMResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -156,6 +152,11 @@ func (r *VMResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 	username = data.Username.ValueString()
 	password = data.Password.ValueString()
 	machine_name = data.Machine_name.ValueString()
+	//machine_stop := data.Machine_stop.ValueBool()
+	var choice string
+
+	fmt.Printf("%s kill or stop? Pleace input your choice.", machine_name)
+	fmt.Scan(&choice)
 
 	if machine_name == "" {
 		f, err := os.Open(".machine_name.txt")
@@ -176,23 +177,13 @@ func (r *VMResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 
 	}
 	log.Printf("うおおおおおおおおおお%s\n\n\n\n\n", machine_name)
-	//result1 := []rune(machine_name)
-	//	result2 := []rune("EC2-geotail-144223")
-	/*
-		for i := 0; ; i++ {
-			if result1[i] == result2[i] {
-				log.Printf("一緒やで%q", result1)
-			} else {
-				log.Printf("ちがうやん%q", result2)
-				return
-			}
-		}
-	*/
+
 	delete_vm(username, password, machine_name)
 }
 
 func (r *VMResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 
+	// Get refreshed order value from HashiCups
 }
 
 func (r *VMResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
