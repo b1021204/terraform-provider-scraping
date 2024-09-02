@@ -66,3 +66,14 @@ func stop_vm(username string, password string, machine_name string) {
 	page.CloseWindow()
 
 }
+
+/*
+デバック用コード
+func main() {
+	username := "b1021204"
+	password := "SAKURAskip108"
+	machine_name := "EC2-geotail-153025"
+	stop_vm(username, password, machine_name)
+
+}
+*/
