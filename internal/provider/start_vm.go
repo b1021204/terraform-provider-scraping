@@ -9,13 +9,16 @@ import (
 )
 
 func start_vm(username string, password string, machine_name string) {
-	driver := agouti.ChromeDriver(
-		agouti.ChromeOptions(
-			"args", []string{
-				"--headless",
-				"--disavle-gpu",
-			}),
-	)
+	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
+	/*
+	   デバック中のためコメントアウト
+	   	driver := agouti.ChromeDriver(
+	   		agouti.ChromeOptions(
+	   			"args", []string{
+	   				"--headless",
+	   				"--disavle-gpu",
+	   			}),
+	   	)*/
 	log.Printf("Open Google Chorome...")
 
 	if err := driver.Start(); err != nil {
@@ -26,6 +29,7 @@ func start_vm(username string, password string, machine_name string) {
 	page, err := driver.NewPage()
 	if err != nil {
 		log.Fatalf("Failed to open page:%v", err)
+		time.Sleep(5 * time.Second)
 	} // go to login page
 	if err := page.Navigate("https://manage.p.fun.ac.jp/server_manage"); err != nil {
 		log.Fatalf("Failed to navigate:%v", err)
@@ -74,7 +78,7 @@ func start_vm(username string, password string, machine_name string) {
 					return
 				}
 				log.Printf("start %v!!", machine_name)
-				return
+
 			}
 		}
 
@@ -84,11 +88,11 @@ func start_vm(username string, password string, machine_name string) {
 }
 
 /*
+デバック用コード
 func main() {
 	username := "b1021204"
-	password := "EPa6ouQ2"
+	password := "SAKURAskip108"
 	machine_name := "EC2-geotail-153025"
 	start_vm(username, password, machine_name)
-
 }
 */

@@ -3,13 +3,11 @@ package provider
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	//"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"log"
 	"net/http"
 	"os"
-
-	"github.com/hashicorp/terraform-plugin-framework/resource"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -138,7 +136,50 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 }
 
 func (r *VMResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	return
+
+	var data VMResourceModel
+	username := "default"
+	password := "default"
+	machine_name := ""
+	machine_stop := false
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	username = data.Username.ValueString()
+	password = data.Password.ValueString()
+	machine_name = data.Machine_name.ValueString()
+	machine_stop = data.Machine_stop.ValueBool()
+
+	ctx = tflog.SetField(ctx, "username", username)
+	ctx = tflog.SetField(ctx, "password", password)
+
+	if machine_name == "" {
+		log.Printf("machine_name is null." +
+			"We will create new machine. If you want to stand-up machine which already created, you should put name in machine_name")
+	} else {
+		ctx = tflog.SetField(ctx, "machine_name", machine_name)
+	}
+	// machine名が入力されていれば起動、なければ作成
+	if machine_name == "" {
+		create_vm(username, password, machine_name)
+		//log.Printf("Save machine_name")
+	} else {
+
+		if machine_stop {
+			stop_vm(username, password, machine_name)
+
+		} else {
+			log.Printf("スタートしてるよーーーー")
+			start_vm(username, password, machine_name)
+		}
+
+	}
+
+	log.Printf("Compleate!!!")
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *VMResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
