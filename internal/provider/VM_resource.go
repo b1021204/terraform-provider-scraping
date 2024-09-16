@@ -26,6 +26,14 @@ type VMResource struct {
 	client *http.Client
 }
 
+type Machine_Data struct {
+	enviroment   string
+	username     string
+	password     string
+	machine_name string
+	machine_stop bool
+}
+
 // ExampleResourceModel describes the resource data model.
 type VMResourceModel struct {
 	Environment  types.String `tfsdk:"environment"`
@@ -90,42 +98,40 @@ func (r *VMResource) Configure(ctx context.Context, req resource.ConfigureReques
 func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 
 	var data VMResourceModel
-	username := "default"
-	password := "default"
-	machine_name := ""
-	machine_stop := false
+	var Machine_Data Machine_Data
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	username = data.Username.ValueString()
-	password = data.Password.ValueString()
-	machine_name = data.Machine_name.ValueString()
-	machine_stop = data.Machine_stop.ValueBool()
+	// Machine_Dataにtfファイルの内容を渡す
+	Machine_Data.username = data.Username.ValueString()
+	Machine_Data.password = data.Password.ValueString()
+	Machine_Data.machine_name = data.Machine_name.ValueString()
+	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
 
-	ctx = tflog.SetField(ctx, "username", username)
-	ctx = tflog.SetField(ctx, "password", password)
+	ctx = tflog.SetField(ctx, "username", Machine_Data.username)
+	ctx = tflog.SetField(ctx, "password", Machine_Data.password)
 
-	if machine_name == "" {
+	if Machine_Data.machine_name == "" {
+		// マシン名が指定されていない時、新規でVMを立ち上げる
 		log.Printf("machine_name is null." +
 			"We will create new machine. If you want to stand-up machine which already created, you should put name in machine_name")
 	} else {
-		ctx = tflog.SetField(ctx, "machine_name", machine_name)
+		ctx = tflog.SetField(ctx, "machine_name", Machine_Data.machine_name)
 	}
-	// machine名が入力されていれば起動、なければ作成
-	if machine_name == "" {
-		create_vm(username, password, machine_name)
-		//log.Printf("Save machine_name")
+	if Machine_Data.machine_name == "" {
+		// machine名が入力されてなければ作成
+		create_vm(Machine_Data)
 	} else {
 
-		if machine_stop {
-			stop_vm(username, password, machine_name)
+		if Machine_Data.machine_stop {
+			stop_vm(Machine_Data)
 
 		} else {
-			log.Printf("スタートしてるよーーーー")
-			start_vm(username, password, machine_name)
+			log.Printf("already start VM.")
+			start_vm(Machine_Data)
 		}
 
 	}
@@ -138,42 +144,38 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 func (r *VMResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 
 	var data VMResourceModel
-	username := "default"
-	password := "default"
-	machine_name := ""
-	machine_stop := false
+	var Machine_Data Machine_Data
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	username = data.Username.ValueString()
-	password = data.Password.ValueString()
-	machine_name = data.Machine_name.ValueString()
-	machine_stop = data.Machine_stop.ValueBool()
+	Machine_Data.username = data.Username.ValueString()
+	Machine_Data.password = data.Password.ValueString()
+	Machine_Data.machine_name = data.Machine_name.ValueString()
+	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
 
-	ctx = tflog.SetField(ctx, "username", username)
-	ctx = tflog.SetField(ctx, "password", password)
+	ctx = tflog.SetField(ctx, "username", Machine_Data.username)
+	ctx = tflog.SetField(ctx, "password", Machine_Data.password)
 
-	if machine_name == "" {
+	if Machine_Data.machine_name == "" {
 		log.Printf("machine_name is null." +
 			"We will create new machine. If you want to stand-up machine which already created, you should put name in machine_name")
 	} else {
-		ctx = tflog.SetField(ctx, "machine_name", machine_name)
+		ctx = tflog.SetField(ctx, "machine_name", Machine_Data.machine_name)
 	}
 	// machine名が入力されていれば起動、なければ作成
-	if machine_name == "" {
-		create_vm(username, password, machine_name)
+	if Machine_Data.machine_name == "" {
+		create_vm(Machine_Data)
 		//log.Printf("Save machine_name")
 	} else {
 
-		if machine_stop {
-			stop_vm(username, password, machine_name)
-
+		if Machine_Data.machine_stop {
+			stop_vm(Machine_Data)
 		} else {
 			log.Printf("スタートしてるよーーーー")
-			start_vm(username, password, machine_name)
+			start_vm(Machine_Data)
 		}
 
 	}

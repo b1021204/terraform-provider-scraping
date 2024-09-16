@@ -8,7 +8,8 @@ import (
 	"time"
 )
 
-func create_vm(username string, password string, machine_name string) {
+func create_vm(Machine_Data Machine_Data) {
+
 	// ブラウザはChromeを指定して起動
 	driver := agouti.ChromeDriver(
 		agouti.ChromeOptions(
@@ -35,8 +36,8 @@ func create_vm(username string, password string, machine_name string) {
 
 	elem_user := page.FindByName("username")
 	elem_pass := page.FindByName("password")
-	elem_user.Fill(username)
-	elem_pass.Fill(password)
+	elem_user.Fill(Machine_Data.username)
+	elem_pass.Fill(Machine_Data.password)
 	// Submit
 	if err := page.FindByClass("credentials_input_submit").Click(); err != nil {
 		log.Fatalf("Failed to login:%v", err)

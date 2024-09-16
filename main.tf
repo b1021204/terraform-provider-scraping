@@ -15,6 +15,13 @@ resource "scraping_resource" "example"{
     environment = "Linux(Ubuntu22.04LTS)(2024前期)"
     username = "b1021204"
     password = "SAKURAskip108" 
-    machine_name = "EC2-geotail-153025"
-    machine_stop = true
+    machine_name = "EC2-geotail-153037"
+    machine_stop = false
+
+     provisioner "local-exec" {
+    command = "echo The servers IP address is ??? >> a.txt"
+  }
 } 
+
+
+
