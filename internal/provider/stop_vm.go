@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func stop_vm(username string, password string, machine_name string) {
+func stop_vm(Machine_Data Machine_Data) {
 	// ブラウザはChromeを指定して起動
 	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
 	if err := driver.Start(); err != nil {
@@ -26,8 +26,8 @@ func stop_vm(username string, password string, machine_name string) {
 
 	elem_user := page.FindByName("username")
 	elem_pass := page.FindByName("password")
-	elem_user.Fill(username)
-	elem_pass.Fill(password)
+	elem_user.Fill(Machine_Data.username)
+	elem_pass.Fill(Machine_Data.password)
 	// Submit
 	if err := page.FindByClass("credentials_input_submit").Click(); err != nil {
 		log.Fatalf("Failed to login:%v", err)
@@ -45,8 +45,8 @@ func stop_vm(username string, password string, machine_name string) {
 
 		// web上からterraformに指定されたmachine_nameと合致するものを探す
 		if text, err := instance_name.Text(); err == nil {
-			log.Printf("\n\n\n\n%s\n%s", text, machine_name)
-			if text == machine_name {
+			log.Printf("\n\n\n\n%s\n%s", text, Machine_Data.machine_name)
+			if text == Machine_Data.machine_name {
 				log.Printf("get machine_name!!\n\n\n\n%s", text)
 				if err := page.FindByName("stopBtn_" + strconv.Itoa(i)).Click(); err != nil {
 					log.Fatalf("Failed to delete;%v", err)
@@ -58,7 +58,7 @@ func stop_vm(username string, password string, machine_name string) {
 				}
 				return
 			} else {
-				log.Printf("ううううううおあおあおあお\n\nましんめいみつからないようおOOOoooooo\n\n\n")
+				log.Printf("Can't find machine name. Please confirm machine name which you want to stop.")
 			}
 		}
 
