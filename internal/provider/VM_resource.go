@@ -66,6 +66,14 @@ func (f *ip) Definition(ctx context.Context, req function.DefinitionRequest, res
 		Description: "Given a machine_name, return ip address",
 		Parameters: []function.Parameter{
 			function.StringParameter{
+				Name:        "username",
+				Description: "username",
+			},
+			function.StringParameter{
+				Name:        "password",
+				Description: "pass",
+			},
+			function.StringParameter{
 				Name:        "machine_name",
 				Description: "machine's name",
 			},
@@ -265,11 +273,14 @@ func (r *VMResource) Read(ctx context.Context, req resource.ReadRequest, resp *r
 }
 
 func (f *ip) Run(ctx context.Context, req function.RunRequest, resp *function.RunResponse) {
-	var Machine_Data Machine_Data
+	//var Machine_Data Machine_Data
 	var ip string
+	var username string
+	var password string
+	var machine_name string
 
 	// Read Terraform argument data into the variables
-	resp.Error = function.ConcatFuncErrors(resp.Error, req.Arguments.Get(ctx, &Machine_Data))
+	resp.Error = function.ConcatFuncErrors(resp.Error, req.Arguments.Get(ctx, &username, &password, &machine_name))
 
 	//　スクレイピングでipアドレスを抽出する
 	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
@@ -301,13 +312,13 @@ func (f *ip) Run(ctx context.Context, req function.RunRequest, resp *function.Ru
 	time.Sleep(1 * time.Second)
 
 	elem_user := page.FindByName("username")
-	log.Printf("Input username = %v", Machine_Data.username)
+	log.Printf("Input username = %v", username)
 
 	elem_pass := page.FindByName("password")
 	log.Printf("Input password")
 
-	elem_user.Fill(Machine_Data.username)
-	elem_pass.Fill(Machine_Data.password)
+	elem_user.Fill(username)
+	elem_pass.Fill(password)
 	log.Printf("login...")
 	// Submit
 	if err := page.FindByClass("credentials_input_submit").Click(); err != nil {
@@ -323,15 +334,16 @@ func (f *ip) Run(ctx context.Context, req function.RunRequest, resp *function.Ru
 	}
 
 	for i := 0; i < 20; i++ {
-		log.Printf("serch for machin_name = %v", Machine_Data.machine_name)
+		log.Printf("serch for machin_name = %v", machine_name)
 		instance_name := page.FindByID("INSTANCE_NAME_" + strconv.Itoa(i))
 
 		// web上からterraformに指定されたmachine_nameと合致するものを探す
 		if text, err := instance_name.Text(); err == nil {
-			if text == Machine_Data.machine_name {
-				log.Printf("found machin_name = %v!!!", Machine_Data.machine_name)
-				log.Printf("start %v...", Machine_Data.machine_name)
-				log.Printf("%v", page.FindByID("copiable-ip_address-"+strconv.Itoa(i)))
+			if text == machine_name {
+				log.Printf("found machin_name = %v!!!", machine_name)
+				log.Printf("start %v...", machine_name)
+				ip, _ = page.FindByID("copiable-ip_address-" + strconv.Itoa(i)).Text()
+				log.Printf("%v", ip)
 
 			}
 		}
