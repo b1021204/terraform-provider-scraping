@@ -12,6 +12,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	"github.com/sclevine/agouti"
+	"strconv"
+	"time"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -68,85 +72,6 @@ func (f *ip) Definition(ctx context.Context, req function.DefinitionRequest, res
 		},
 		Return: function.StringReturn{},
 	}
-}
-
-func (f *ip) Run() (ctx context.Context, req function.RunRequest, resp *function.RunResponse) {
-	var machine_name string
-	var ip string
-
-	// Read Terraform argument data into the variables
-	resp.Error = function.ConcatFuncErrors(resp.Error, req.Arguments.Get(ctx, &machine_name))
-
-	//　スクレイピングでipアドレスを抽出する
-	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
-	/*
-	   デバック中のためコメントアウト
-	   	driver := agouti.ChromeDriver(
-	   		agouti.ChromeOptions(
-	   			"args", []string{
-	   				"--headless",
-	   				"--disavle-gpu",
-	   			}),
-	   	)*/
-	log.Printf("Open Google Chorome...")
-
-	if err := driver.Start(); err != nil {
-		log.Fatalf("Failed to start driver:%v", err)
-	}
-	defer driver.Stop()
-	log.Printf("Access to FUN VM WebAPI...")
-	page, err := driver.NewPage()
-	if err != nil {
-		log.Fatalf("Failed to open page:%v", err)
-		time.Sleep(1 * time.Second)
-	} // go to login page
-	if err := page.Navigate("https://manage.p.fun.ac.jp/server_manage"); err != nil {
-		log.Fatalf("Failed to navigate:%v", err)
-	}
-	log.Printf("Success to FUN VM WebAPI")
-	time.Sleep(1 * time.Second)
-
-	elem_user := page.FindByName("username")
-	log.Printf("Input username = %v", Machine_Data.username)
-
-	elem_pass := page.FindByName("password")
-	log.Printf("Input password")
-
-	elem_user.Fill(Machine_Data.username)
-	elem_pass.Fill(Machine_Data.password)
-	log.Printf("login...")
-	// Submit
-	if err := page.FindByClass("credentials_input_submit").Click(); err != nil {
-		log.Fatalf("Failed to login:%v", err)
-		return
-	}
-	log.Printf("Success to login FUN VM WebAPI!!")
-
-	time.Sleep(1 * time.Second)
-	if err := page.FindByXPath("/html/body/div/div/main/div/form/div[2]/div/span").Click(); err != nil {
-		log.Fatalf("Failed to choice:%v", err)
-		return
-	}
-
-	for i := 0; i < 20; i++ {
-		log.Printf("serch for machin_name = %v", Machine_Data.machine_name)
-		instance_name := page.FindByID("INSTANCE_NAME_" + strconv.Itoa(i))
-
-		// web上からterraformに指定されたmachine_nameと合致するものを探す
-		if text, err := instance_name.Text(); err == nil {
-			if text == Machine_Data.machine_name {
-				log.Printf("found machin_name = %v!!!", Machine_Data.machine_name)
-				log.Printf("start %v...", Machine_Data.machine_name)
-				lof.Printf(page.FindByD("copiable-ip_address-" + strconv.Itoa(i)))
-
-			}
-		}
-
-	}
-	page.CloseWindow()
-
-	resp.Error = function.ConcatFuncErrors(resp.Error, resp.Result.Set(ctx, ip))
-
 }
 
 func (r *VMResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -337,4 +262,82 @@ func (r *VMResource) ImportState(ctx context.Context, req resource.ImportStateRe
 
 func (r *VMResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 
+}
+
+func (f *ip) Run(ctx context.Context, req function.RunRequest, resp *function.RunResponse) {
+	var Machine_Data Machine_Data
+	var ip string
+
+	// Read Terraform argument data into the variables
+	resp.Error = function.ConcatFuncErrors(resp.Error, req.Arguments.Get(ctx, &Machine_Data))
+
+	//　スクレイピングでipアドレスを抽出する
+	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
+	/*
+		   デバック中のためコメントアウト
+			   driver := agouti.ChromeDriver(
+				   agouti.ChromeOptions(
+					   "args", []string{
+						   "--headless",
+						   "--disavle-gpu",
+					   }),
+			   )*/
+	log.Printf("Open Google Chorome...")
+
+	if err := driver.Start(); err != nil {
+		log.Fatalf("Failed to start driver:%v", err)
+	}
+	defer driver.Stop()
+	log.Printf("Access to FUN VM WebAPI...")
+	page, err := driver.NewPage()
+	if err != nil {
+		log.Fatalf("Failed to open page:%v", err)
+		time.Sleep(1 * time.Second)
+	} // go to login page
+	if err := page.Navigate("https://manage.p.fun.ac.jp/server_manage"); err != nil {
+		log.Fatalf("Failed to navigate:%v", err)
+	}
+	log.Printf("Success to FUN VM WebAPI")
+	time.Sleep(1 * time.Second)
+
+	elem_user := page.FindByName("username")
+	log.Printf("Input username = %v", Machine_Data.username)
+
+	elem_pass := page.FindByName("password")
+	log.Printf("Input password")
+
+	elem_user.Fill(Machine_Data.username)
+	elem_pass.Fill(Machine_Data.password)
+	log.Printf("login...")
+	// Submit
+	if err := page.FindByClass("credentials_input_submit").Click(); err != nil {
+		log.Fatalf("Failed to login:%v", err)
+		return
+	}
+	log.Printf("Success to login FUN VM WebAPI!!")
+
+	time.Sleep(1 * time.Second)
+	if err := page.FindByXPath("/html/body/div/div/main/div/form/div[2]/div/span").Click(); err != nil {
+		log.Fatalf("Failed to choice:%v", err)
+		return
+	}
+
+	for i := 0; i < 20; i++ {
+		log.Printf("serch for machin_name = %v", Machine_Data.machine_name)
+		instance_name := page.FindByID("INSTANCE_NAME_" + strconv.Itoa(i))
+
+		// web上からterraformに指定されたmachine_nameと合致するものを探す
+		if text, err := instance_name.Text(); err == nil {
+			if text == Machine_Data.machine_name {
+				log.Printf("found machin_name = %v!!!", Machine_Data.machine_name)
+				log.Printf("start %v...", Machine_Data.machine_name)
+				log.Printf("%v", page.FindByID("copiable-ip_address-"+strconv.Itoa(i)))
+
+			}
+		}
+
+	}
+	page.CloseWindow()
+	resp.Error = function.ConcatFuncErrors(resp.Error, resp.Result.Set(ctx, ip))
+	return
 }

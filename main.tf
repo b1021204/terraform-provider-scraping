@@ -21,6 +21,10 @@ resource "scraping_resource" "example"{
      provisioner "local-exec" {
     command = "echo The servers IP address is ??? >> a.txt"
   }
+
+
+    value = provider::scraping::ip("EC2-geotail-153037")
+
 } 
 
 
