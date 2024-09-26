@@ -34,6 +34,20 @@ func stop_vm(Machine_Data Machine_Data) {
 		return
 	}
 	time.Sleep(1 * time.Second)
+	for i := 1; i < 5; i++ {
+
+		text, _ := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Text()
+		if text == "Linux(Ubuntu22.04LTS)(2024後期)" {
+
+			log.Printf("発見！！\n")
+			if err := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Click(); err != nil {
+				log.Fatalf("Failed to choice:%v", err)
+				return
+			}
+
+		}
+	}
+
 	if err := page.FindByXPath("/html/body/div/div/main/div/form/div[2]/div/span").Click(); err != nil {
 		log.Fatalf("Failed to choice:%v", err)
 		return
