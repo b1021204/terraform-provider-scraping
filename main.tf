@@ -16,7 +16,7 @@ resource "scraping_resource" "example"{
     environment = "Linux(Ubuntu22.04LTS)(2024前期)(10/31廃止)"
     username = "b1021204"
     password = "SAKURAskip108" 
-    machine_name = ""
+    machine_name = "EC2-geotail-155163"
     machine_stop = false
 }
 /*
