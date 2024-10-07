@@ -12,18 +12,19 @@ terraform {
 provider "scraping" {}
 
 resource "scraping_resource" "example"{
+  
     environment = "Linux(Ubuntu22.04LTS)(2024後期)"
     username = "b1021204"
     password = "SAKURAskip108" 
-    machine_name = "EC2-pollux-153142"
+    machine_name = "EC2-pollux-152237"
     machine_stop = true
-
+}
 /*
   connection {
     type     = "ssh"
     user     = "ubuntu"
-    password = "1OVXcWsd"
-    private_key = file("/Users/nsysk01/univ/b4/terraform-provider-scraping/funawskeyb1021204.pem")
+    password = provider::scraping::ip("b1021204", "SAKURAskip108", "EC2-geotail-153037")
+    private_key = file("/Users/nsysk_0101/univ/b4/terraform-provider-scraping/funawskeyb1021204.pem")
     host     = provider::scraping::ip("b1021204", "SAKURAskip108", "EC2-geotail-153037")
   }
 
@@ -32,8 +33,9 @@ resource "scraping_resource" "example"{
       "echo The servers IP address is ??? >> a.txt"
         ]
   }
-  */
-} 
+  
+} */
+
 /*
 output "ip" {
     value = provider::scraping::ip("b1021204", "SAKURAskip108", "EC2-geotail-153037")

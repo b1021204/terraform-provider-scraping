@@ -114,5 +114,7 @@ func (p *scrapingProvider) Resources(_ context.Context) []func() resource.Resour
 func (p *scrapingProvider) Functions(_ context.Context) []func() function.Function {
 	return []func() function.Function{
 		NewIp,
+		NewMachinePass,
 	}
+
 }

@@ -49,9 +49,9 @@ func create_vm(Machine_Data Machine_Data) {
 	for i := 1; i < 5; i++ {
 
 		text, _ := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Text()
-		if text == "Linux(Ubuntu22.04LTS)(2024後期)" {
+		if text == Machine_Data.environment {
 
-			log.Printf("発見！！\n")
+			log.Printf("発見:%s=%s\n", Machine_Data.environment, text)
 			if err := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Click(); err != nil {
 				log.Fatalf("Failed to choice:%v", err)
 				return

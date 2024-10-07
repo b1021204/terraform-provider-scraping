@@ -40,10 +40,12 @@ func stop_vm(Machine_Data Machine_Data) {
 		if text == "Linux(Ubuntu22.04LTS)(2024後期)" {
 
 			log.Printf("発見！！\n")
-			if err := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Click(); err != nil {
-				log.Fatalf("Failed to choice:%v", err)
-				return
-			}
+			/*
+				if err := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Click(); err != nil {
+					log.Fatalf("Failed to choice:%v", err)
+					return
+				}
+			*/
 
 		}
 	}
