@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -12,7 +13,8 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ provider.Provider = &scrapingProvider{}
+	_ provider.Provider              = &scrapingProvider{}
+	_ provider.ProviderWithFunctions = &scrapingProvider{}
 )
 
 // New is a helper function to simplify provider server and testing implementation.
@@ -106,4 +108,13 @@ func (p *scrapingProvider) Resources(_ context.Context) []func() resource.Resour
 	return []func() resource.Resource{
 		NewVMResource,
 	}
+}
+
+// IPアドレススクレイピング用ファンクション
+func (p *scrapingProvider) Functions(_ context.Context) []func() function.Function {
+	return []func() function.Function{
+		NewIp,
+		NewMachinePass,
+	}
+
 }

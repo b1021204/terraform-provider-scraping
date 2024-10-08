@@ -3,19 +3,26 @@ package provider
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/hashicorp/terraform-plugin-framework/function"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	"github.com/sclevine/agouti"
+	"strconv"
+	"time"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &VMResource{}
 var _ resource.ResourceWithImportState = &VMResource{}
+var _ function.Function = &ip{}
+var _ function.Function = &machine_pass{}
 
 func NewVMResource() resource.Resource {
 	return &VMResource{}
@@ -24,6 +31,15 @@ func NewVMResource() resource.Resource {
 // ExampleResource defines the resource implementation.
 type VMResource struct {
 	client *http.Client
+}
+
+// 各関数内で使われるデータの構造体
+type Machine_Data struct {
+	environment  string
+	username     string
+	password     string
+	machine_name string
+	machine_stop bool
 }
 
 // ExampleResourceModel describes the resource data model.
@@ -35,10 +51,90 @@ type VMResourceModel struct {
 	Machine_stop types.Bool   `tfsdk:"machine_stop"`
 }
 
+// 　IPアドレスをスクレイピングする関数
+type ip struct{}
+
+// VMのパスワードをスクレイピングする関数
+type machine_pass struct{}
+
+func NewIp() function.Function {
+	return &ip{}
+}
+
+func NewMachinePass() function.Function {
+	return &machine_pass{}
+}
+
+// ipアドレススクレイピング用のメタデータ
+func (f *ip) Metadata(ctx context.Context, req function.MetadataRequest, resp *function.MetadataResponse) {
+	resp.Name = "ip"
+}
+
+// ipアドレススクレイピング用の定義
+func (f *ip) Definition(ctx context.Context, req function.DefinitionRequest, resp *function.DefinitionResponse) {
+	resp.Definition = function.Definition{
+		Summary:     "Search for ip address",
+		Description: "Given a machine_name, return ip address",
+		Parameters: []function.Parameter{
+			function.StringParameter{
+				Name:        "username",
+				Description: "username",
+			},
+			function.StringParameter{
+				Name:        "password",
+				Description: "pass",
+			},
+			function.StringParameter{
+				Name:        "environment",
+				Description: "env of VM",
+			},
+			function.StringParameter{
+				Name:        "machine_name",
+				Description: "machine's name",
+			},
+		},
+		Return: function.StringReturn{},
+	}
+}
+
+// マシンパスワードスクレイピング用のメタデータ
+func (f *machine_pass) Metadata(ctx context.Context, req function.MetadataRequest, resp *function.MetadataResponse) {
+	resp.Name = "machien_pass"
+}
+
+// マシンパスワードスクレイピング用の定義
+func (f *machine_pass) Definition(ctx context.Context, req function.DefinitionRequest, resp *function.DefinitionResponse) {
+	resp.Definition = function.Definition{
+		Summary:     "Search for VM's password",
+		Description: "Given a machine_name and fun userdata, return machine password",
+		Parameters: []function.Parameter{
+			function.StringParameter{
+				Name:        "username",
+				Description: "username",
+			},
+			function.StringParameter{
+				Name:        "password",
+				Description: "pass",
+			},
+			function.StringParameter{
+				Name:        "environment",
+				Description: "env of VM",
+			},
+			function.StringParameter{
+				Name:        "machine_name",
+				Description: "machine's name",
+			},
+		},
+		Return: function.StringReturn{},
+	}
+}
+
+// resource用のメタデータ
 func (r *VMResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_resource"
 }
 
+// resource用のスキーマ
 func (r *VMResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
@@ -67,6 +163,7 @@ func (r *VMResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 	}
 }
 
+// resource用のconigure
 func (r *VMResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
@@ -87,45 +184,45 @@ func (r *VMResource) Configure(ctx context.Context, req resource.ConfigureReques
 	r.client = client
 }
 
+// マシン作成時の動作
 func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 
 	var data VMResourceModel
-	username := "default"
-	password := "default"
-	machine_name := ""
-	machine_stop := false
+	var Machine_Data Machine_Data
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	username = data.Username.ValueString()
-	password = data.Password.ValueString()
-	machine_name = data.Machine_name.ValueString()
-	machine_stop = data.Machine_stop.ValueBool()
+	// Machine_Dataにtfファイルの内容を渡す
+	Machine_Data.username = data.Username.ValueString()
+	Machine_Data.password = data.Password.ValueString()
+	Machine_Data.machine_name = data.Machine_name.ValueString()
+	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
+	Machine_Data.environment = data.Environment.ValueString()
 
-	ctx = tflog.SetField(ctx, "username", username)
-	ctx = tflog.SetField(ctx, "password", password)
+	ctx = tflog.SetField(ctx, "username", Machine_Data.username)
+	ctx = tflog.SetField(ctx, "password", Machine_Data.password)
 
-	if machine_name == "" {
+	if Machine_Data.machine_name == "" {
+		// マシン名が指定されていない時、新規でVMを立ち上げる
 		log.Printf("machine_name is null." +
 			"We will create new machine. If you want to stand-up machine which already created, you should put name in machine_name")
 	} else {
-		ctx = tflog.SetField(ctx, "machine_name", machine_name)
+		ctx = tflog.SetField(ctx, "machine_name", Machine_Data.machine_name)
 	}
-	// machine名が入力されていれば起動、なければ作成
-	if machine_name == "" {
-		create_vm(username, password, machine_name)
-		//log.Printf("Save machine_name")
+	if Machine_Data.machine_name == "" {
+		// machine名が入力されてなければ作成
+		create_vm(Machine_Data)
 	} else {
 
-		if machine_stop {
-			stop_vm(username, password, machine_name)
+		if Machine_Data.machine_stop {
+			stop_vm(Machine_Data)
 
 		} else {
-			log.Printf("スタートしてるよーーーー")
-			start_vm(username, password, machine_name)
+			log.Printf("already start VM.")
+			start_vm(Machine_Data)
 		}
 
 	}
@@ -138,42 +235,40 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 func (r *VMResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 
 	var data VMResourceModel
-	username := "default"
-	password := "default"
-	machine_name := ""
-	machine_stop := false
+	var Machine_Data Machine_Data
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	username = data.Username.ValueString()
-	password = data.Password.ValueString()
-	machine_name = data.Machine_name.ValueString()
-	machine_stop = data.Machine_stop.ValueBool()
+	Machine_Data.username = data.Username.ValueString()
+	Machine_Data.password = data.Password.ValueString()
+	Machine_Data.environment = data.Environment.ValueString()
+	Machine_Data.machine_name = data.Machine_name.ValueString()
+	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
 
-	ctx = tflog.SetField(ctx, "username", username)
-	ctx = tflog.SetField(ctx, "password", password)
+	ctx = tflog.SetField(ctx, "username", Machine_Data.username)
+	ctx = tflog.SetField(ctx, "password", Machine_Data.password)
 
-	if machine_name == "" {
+	if Machine_Data.machine_name == "" {
 		log.Printf("machine_name is null." +
 			"We will create new machine. If you want to stand-up machine which already created, you should put name in machine_name")
 	} else {
-		ctx = tflog.SetField(ctx, "machine_name", machine_name)
+		ctx = tflog.SetField(ctx, "machine_name", Machine_Data.machine_name)
 	}
 	// machine名が入力されていれば起動、なければ作成
-	if machine_name == "" {
-		create_vm(username, password, machine_name)
-		//log.Printf("Save machine_name")
+	if Machine_Data.machine_name == "" {
+		log.Printf("Now, create new vm machine...")
+		create_vm(Machine_Data)
 	} else {
 
-		if machine_stop {
-			stop_vm(username, password, machine_name)
-
+		if Machine_Data.machine_stop {
+			log.Printf("Now, %v is stoping...", Machine_Data.machine_name)
+			stop_vm(Machine_Data)
 		} else {
-			log.Printf("スタートしてるよーーーー")
-			start_vm(username, password, machine_name)
+			log.Printf("Now, %v is starting...", Machine_Data.machine_name)
+			start_vm(Machine_Data)
 		}
 
 	}
@@ -183,23 +278,22 @@ func (r *VMResource) Update(ctx context.Context, req resource.UpdateRequest, res
 }
 
 func (r *VMResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+
 	var data VMResourceModel
+	var Machine_Data Machine_Data
 
-	// Read Terraorm prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	// Convert from Terraform data model into strings
-	var username, password, machine_name string
-	username = data.Username.ValueString()
-	password = data.Password.ValueString()
-	machine_name = data.Machine_name.ValueString()
-	//machine_stop := data.Machine_stop.ValueBool()
-	var choice string
+	Machine_Data.username = data.Username.ValueString()
+	Machine_Data.password = data.Password.ValueString()
+	Machine_Data.environment = data.Environment.ValueString()
+	Machine_Data.machine_name = data.Machine_name.ValueString()
+	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
 
-	fmt.Printf("%s kill or stop? Pleace input your choice.", machine_name)
-	fmt.Scan(&choice)
-
-	if machine_name == "" {
+	if Machine_Data.machine_name == "" {
 		f, err := os.Open(".machine_name.txt")
 		if err != nil {
 			fmt.Println("Can't get machine_name. You should confirm the file which named \".machine_name.txt\" .")
@@ -212,21 +306,240 @@ func (r *VMResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 			fmt.Printf("error! You should confirm the file which named \".machine_name.txt\" .")
 		}
 
-		machine_name = string(buf[:n])
-		log.Printf("%s", machine_name)
+		Machine_Data.machine_name = string(buf[:n])
+		log.Printf("%s", Machine_Data.machine_name)
 		//delete_vm(username, password, machine_name)
 
 	}
-	log.Printf("うおおおおおおおおおお%s\n\n\n\n\n", machine_name)
+	log.Printf("Deleating: %s...\n", Machine_Data.machine_name)
 
-	delete_vm(username, password, machine_name)
+	delete_vm(Machine_Data)
 }
 
 func (r *VMResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-
 	// Get refreshed order value from HashiCups
 }
 
 func (r *VMResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 
+}
+
+func (f *ip) Run(ctx context.Context, req function.RunRequest, resp *function.RunResponse) {
+	//var Machine_Data Machine_Data
+	var ip string
+	var username string
+	var password string
+	var environment string
+	var machine_name string
+
+	// Read Terraform argument data into the variables
+	resp.Error = function.ConcatFuncErrors(resp.Error, req.Arguments.Get(ctx, &username, &password, &environment, &machine_name))
+	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
+	/*
+	   デバック中のためコメントアウト
+	   	driver := agouti.ChromeDriver(
+	   		agouti.ChromeOptions(
+	   			"args", []string{
+	   				"--headless",
+	   				"--disavle-gpu",
+	   			}),
+	   	)*/
+	log.Printf("Open Google Chorome...\n")
+
+	if err := driver.Start(); err != nil {
+		log.Fatalf("Failed to start driver:%v\n", err)
+	}
+
+	defer driver.Stop()
+	page, err := driver.NewPage()
+	if err != nil {
+		log.Fatalf("Failed to open Chorome page:%v\n", err)
+	}
+	log.Printf("Success to open Google Chorome.\n")
+
+	// access to FUN login page..
+	log.Printf("Access to FUN VM WebAPI...\n")
+	if err := page.Navigate("https://manage.p.fun.ac.jp/server_manage"); err != nil {
+		log.Fatalf("Failed to access to FUN VM WebAPI:%v\n", err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	// 入力ボックスにユーザ名・パスを打ち込む
+	elem_user := page.FindByName("username")
+	elem_pass := page.FindByName("password")
+	elem_user.Fill(username)
+	elem_pass.Fill(password)
+	log.Printf("fill username: %v\n", username)
+	log.Printf("fill password\n")
+
+	// Submit
+	if err := page.FindByClass("credentials_input_submit").Click(); err != nil {
+		log.Fatalf("Failed to login:%v\n", err)
+		return
+	}
+	log.Printf("Success to login FUN VM WebAPI!!\n")
+
+	time.Sleep(1 * time.Second)
+
+	// 環境画面の項目数を入れる関数。暫定５個に設定しておく
+	max_environment := 5
+	for i := 1; i <= max_environment; i++ {
+
+		log.Printf("Serch for environment: %v\n...", environment)
+		text, _ := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Text()
+		if text == environment {
+
+			log.Printf("get environment: %v\n", text)
+			if err := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Click(); err != nil {
+				log.Fatalf("Failed to click environment: %v\n", err)
+			}
+			break
+		}
+		//　max_environment個分のの項目をチェックしてなかった場合エラーにする
+		if i == max_environment {
+			log.Fatalf("Can't look up environment: %v\n", environment)
+		}
+	}
+
+	// 次のページへ行く
+	if err := page.FindByXPath("/html/body/div/div/main/div/form/div[2]/div/span").Click(); err != nil {
+		log.Fatalf("faild to click next page bottuon")
+	}
+
+	time.Sleep(1 * time.Second)
+
+	max_machine := 5
+	for i := 0; i <= max_machine; i++ {
+		log.Printf("serch for machin_name = %v", machine_name)
+		instance_name := page.FindByID("INSTANCE_NAME_" + strconv.Itoa(i))
+
+		// web上からterraformに指定されたmachine_nameと合致するものを探す
+		if text, err := instance_name.Text(); err == nil {
+			if text == machine_name {
+				log.Printf("found machin_name = %v!!!", machine_name)
+				log.Printf("start %v...", machine_name)
+				ip, _ = page.FindByID("copiable-ip_address-" + strconv.Itoa(i)).Text()
+				log.Printf("%v", ip)
+				break
+			}
+		}
+		if max_machine == i {
+			log.Fatalf("Can't get machine_name")
+		}
+	}
+	page.CloseWindow()
+	resp.Error = function.ConcatFuncErrors(resp.Error, resp.Result.Set(ctx, ip))
+	return
+}
+
+// マシンパススクレイピング用のrun
+
+func (f *machine_pass) Run(ctx context.Context, req function.RunRequest, resp *function.RunResponse) {
+	//var Machine_Data Machine_Data
+	var machine_pass string
+	var username string
+	var password string
+	var environment string
+	var machine_name string
+
+	// Read Terraform argument data into the variables
+	resp.Error = function.ConcatFuncErrors(resp.Error, req.Arguments.Get(ctx, &username, &password, &environment, &machine_name))
+	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
+	/*
+	   デバック中のためコメントアウト
+	   	driver := agouti.ChromeDriver(
+	   		agouti.ChromeOptions(
+	   			"args", []string{
+	   				"--headless",
+	   				"--disavle-gpu",
+	   			}),
+	   	)*/
+	log.Printf("Open Google Chorome...\n")
+
+	if err := driver.Start(); err != nil {
+		log.Fatalf("Failed to start driver:%v\n", err)
+	}
+
+	defer driver.Stop()
+	page, err := driver.NewPage()
+	if err != nil {
+		log.Fatalf("Failed to open Chorome page:%v\n", err)
+	}
+	log.Printf("Success to open Google Chorome.\n")
+
+	// access to FUN login page..
+	log.Printf("Access to FUN VM WebAPI...\n")
+	if err := page.Navigate("https://manage.p.fun.ac.jp/server_manage"); err != nil {
+		log.Fatalf("Failed to access to FUN VM WebAPI:%v\n", err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	// 入力ボックスにユーザ名・パスを打ち込む
+	elem_user := page.FindByName("username")
+	elem_pass := page.FindByName("password")
+	elem_user.Fill(username)
+	elem_pass.Fill(password)
+	log.Printf("fill username: %v\n", username)
+	log.Printf("fill password\n")
+
+	// Submit
+	if err := page.FindByClass("credentials_input_submit").Click(); err != nil {
+		log.Fatalf("Failed to login:%v\n", err)
+		return
+	}
+	log.Printf("Success to login FUN VM WebAPI!!\n")
+
+	time.Sleep(1 * time.Second)
+
+	// 環境画面の項目数を入れる関数。暫定５個に設定しておく
+	max_environment := 5
+	for i := 1; i <= max_environment; i++ {
+
+		log.Printf("Serch for environment: %v\n...", environment)
+		text, _ := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Text()
+		if text == environment {
+
+			log.Printf("get environment: %v\n", text)
+			if err := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Click(); err != nil {
+				log.Fatalf("Failed to click environment: %v\n", err)
+			}
+			break
+		}
+		//　max_environment個分のの項目をチェックしてなかった場合エラーにする
+		if i == max_environment {
+			log.Fatalf("Can't look up environment: %v\n", environment)
+		}
+	}
+
+	// 次のページへ行く
+	if err := page.FindByXPath("/html/body/div/div/main/div/form/div[2]/div/span").Click(); err != nil {
+		log.Fatalf("faild to click next page bottuon")
+	}
+
+	time.Sleep(1 * time.Second)
+
+	max_machine := 5
+	for i := 0; i <= max_machine; i++ {
+		log.Printf("serch for machin_name = %v\n", machine_name)
+		instance_name := page.FindByID("INSTANCE_NAME_" + strconv.Itoa(i))
+
+		// web上からterraformに指定されたmachine_nameと合致するものを探す
+		if text, err := instance_name.Text(); err == nil {
+			if text == machine_name {
+				log.Printf("found machin_name = %v!!!\n", machine_name)
+				log.Printf("start %v...", machine_name)
+				machine_pass, _ = page.FindByID("copiable-password-" + strconv.Itoa(i)).Text()
+				log.Printf("%v", machine_pass)
+			}
+		}
+		if max_machine == i {
+			log.Fatalf("Can't get machine_name")
+		}
+
+	}
+	page.CloseWindow()
+	resp.Error = function.ConcatFuncErrors(resp.Error, resp.Result.Set(ctx, machine_pass))
+	return
 }
