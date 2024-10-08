@@ -33,6 +33,7 @@ type VMResource struct {
 	client *http.Client
 }
 
+// 各関数内で使われるデータの構造体
 type Machine_Data struct {
 	environment  string
 	username     string
@@ -84,6 +85,10 @@ func (f *ip) Definition(ctx context.Context, req function.DefinitionRequest, res
 				Description: "pass",
 			},
 			function.StringParameter{
+				Name:        "environment",
+				Description: "env of VM",
+			},
+			function.StringParameter{
 				Name:        "machine_name",
 				Description: "machine's name",
 			},
@@ -112,6 +117,10 @@ func (f *machine_pass) Definition(ctx context.Context, req function.DefinitionRe
 				Description: "pass",
 			},
 			function.StringParameter{
+				Name:        "environment",
+				Description: "env of VM",
+			},
+			function.StringParameter{
 				Name:        "machine_name",
 				Description: "machine's name",
 			},
@@ -120,10 +129,12 @@ func (f *machine_pass) Definition(ctx context.Context, req function.DefinitionRe
 	}
 }
 
+// resource用のメタデータ
 func (r *VMResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_resource"
 }
 
+// resource用のスキーマ
 func (r *VMResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
@@ -152,6 +163,7 @@ func (r *VMResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 	}
 }
 
+// resource用のconigure
 func (r *VMResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
@@ -172,6 +184,7 @@ func (r *VMResource) Configure(ctx context.Context, req resource.ConfigureReques
 	r.client = client
 }
 
+// マシン作成時の動作
 func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 
 	var data VMResourceModel
@@ -265,24 +278,22 @@ func (r *VMResource) Update(ctx context.Context, req resource.UpdateRequest, res
 }
 
 func (r *VMResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+
 	var data VMResourceModel
+	var Machine_Data Machine_Data
 
-	// Read Terraorm prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	// Convert from Terraform data model into strings
-	var username, password, machine_name string
-	username = data.Username.ValueString()
-	password = data.Password.ValueString()
-	machine_name = data.Machine_name.ValueString()
-	//environment = data.Environment.ValueStirng()
-	//machine_stop := data.Machine_stop.ValueBool()
-	var choice string
+	Machine_Data.username = data.Username.ValueString()
+	Machine_Data.password = data.Password.ValueString()
+	Machine_Data.environment = data.Environment.ValueString()
+	Machine_Data.machine_name = data.Machine_name.ValueString()
+	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
 
-	fmt.Printf("%s kill or stop? Pleace input your choice.", machine_name)
-	fmt.Scan(&choice)
-
-	if machine_name == "" {
+	if Machine_Data.machine_name == "" {
 		f, err := os.Open(".machine_name.txt")
 		if err != nil {
 			fmt.Println("Can't get machine_name. You should confirm the file which named \".machine_name.txt\" .")
@@ -295,18 +306,17 @@ func (r *VMResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 			fmt.Printf("error! You should confirm the file which named \".machine_name.txt\" .")
 		}
 
-		machine_name = string(buf[:n])
-		log.Printf("%s", machine_name)
+		Machine_Data.machine_name = string(buf[:n])
+		log.Printf("%s", Machine_Data.machine_name)
 		//delete_vm(username, password, machine_name)
 
 	}
-	log.Printf("うおおおおおおおおおお%s\n\n\n\n\n", machine_name)
+	log.Printf("Deleating: %s...\n", Machine_Data.machine_name)
 
-	delete_vm(username, password, machine_name)
+	delete_vm(Machine_Data)
 }
 
 func (r *VMResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-
 	// Get refreshed order value from HashiCups
 }
 
@@ -319,63 +329,88 @@ func (f *ip) Run(ctx context.Context, req function.RunRequest, resp *function.Ru
 	var ip string
 	var username string
 	var password string
+	var environment string
 	var machine_name string
 
 	// Read Terraform argument data into the variables
-	resp.Error = function.ConcatFuncErrors(resp.Error, req.Arguments.Get(ctx, &username, &password, &machine_name))
-
-	//　スクレイピングでipアドレスを抽出する
+	resp.Error = function.ConcatFuncErrors(resp.Error, req.Arguments.Get(ctx, &username, &password, &environment, &machine_name))
 	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
 	/*
-		   デバック中のためコメントアウト
-			   driver := agouti.ChromeDriver(
-				   agouti.ChromeOptions(
-					   "args", []string{
-						   "--headless",
-						   "--disavle-gpu",
-					   }),
-			   )*/
-	log.Printf("Open Google Chorome...")
+	   デバック中のためコメントアウト
+	   	driver := agouti.ChromeDriver(
+	   		agouti.ChromeOptions(
+	   			"args", []string{
+	   				"--headless",
+	   				"--disavle-gpu",
+	   			}),
+	   	)*/
+	log.Printf("Open Google Chorome...\n")
 
 	if err := driver.Start(); err != nil {
-		log.Fatalf("Failed to start driver:%v", err)
+		log.Fatalf("Failed to start driver:%v\n", err)
 	}
+
 	defer driver.Stop()
-	log.Printf("Access to FUN VM WebAPI...")
 	page, err := driver.NewPage()
 	if err != nil {
-		log.Fatalf("Failed to open page:%v", err)
-		time.Sleep(1 * time.Second)
-	} // go to login page
-	if err := page.Navigate("https://manage.p.fun.ac.jp/server_manage"); err != nil {
-		log.Fatalf("Failed to navigate:%v", err)
+		log.Fatalf("Failed to open Chorome page:%v\n", err)
 	}
-	log.Printf("Success to FUN VM WebAPI")
+	log.Printf("Success to open Google Chorome.\n")
+
+	// access to FUN login page..
+	log.Printf("Access to FUN VM WebAPI...\n")
+	if err := page.Navigate("https://manage.p.fun.ac.jp/server_manage"); err != nil {
+		log.Fatalf("Failed to access to FUN VM WebAPI:%v\n", err)
+	}
+
 	time.Sleep(1 * time.Second)
 
+	// 入力ボックスにユーザ名・パスを打ち込む
 	elem_user := page.FindByName("username")
-	log.Printf("Input username = %v", username)
-
 	elem_pass := page.FindByName("password")
-	log.Printf("Input password")
-
 	elem_user.Fill(username)
 	elem_pass.Fill(password)
-	log.Printf("login...")
+	log.Printf("fill username: %v\n", username)
+	log.Printf("fill password\n")
+
 	// Submit
 	if err := page.FindByClass("credentials_input_submit").Click(); err != nil {
-		log.Fatalf("Failed to login:%v", err)
+		log.Fatalf("Failed to login:%v\n", err)
 		return
 	}
-	log.Printf("Success to login FUN VM WebAPI!!")
+	log.Printf("Success to login FUN VM WebAPI!!\n")
 
 	time.Sleep(1 * time.Second)
-	if err := page.FindByXPath("/html/body/div/div/main/div/form/div[2]/div/span").Click(); err != nil {
-		log.Fatalf("Failed to choice:%v", err)
-		return
+
+	// 環境画面の項目数を入れる関数。暫定５個に設定しておく
+	max_environment := 5
+	for i := 1; i <= max_environment; i++ {
+
+		log.Printf("Serch for environment: %v\n...", environment)
+		text, _ := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Text()
+		if text == environment {
+
+			log.Printf("get environment: %v\n", text)
+			if err := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Click(); err != nil {
+				log.Fatalf("Failed to click environment: %v\n", err)
+			}
+			break
+		}
+		//　max_environment個分のの項目をチェックしてなかった場合エラーにする
+		if i == max_environment {
+			log.Fatalf("Can't look up environment: %v\n", environment)
+		}
 	}
 
-	for i := 0; i < 20; i++ {
+	// 次のページへ行く
+	if err := page.FindByXPath("/html/body/div/div/main/div/form/div[2]/div/span").Click(); err != nil {
+		log.Fatalf("faild to click next page bottuon")
+	}
+
+	time.Sleep(1 * time.Second)
+
+	max_machine := 5
+	for i := 0; i <= max_machine; i++ {
 		log.Printf("serch for machin_name = %v", machine_name)
 		instance_name := page.FindByID("INSTANCE_NAME_" + strconv.Itoa(i))
 
@@ -386,10 +421,12 @@ func (f *ip) Run(ctx context.Context, req function.RunRequest, resp *function.Ru
 				log.Printf("start %v...", machine_name)
 				ip, _ = page.FindByID("copiable-ip_address-" + strconv.Itoa(i)).Text()
 				log.Printf("%v", ip)
-
+				break
 			}
 		}
-
+		if max_machine == i {
+			log.Fatalf("Can't get machine_name")
+		}
 	}
 	page.CloseWindow()
 	resp.Error = function.ConcatFuncErrors(resp.Error, resp.Result.Set(ctx, ip))
@@ -399,78 +436,106 @@ func (f *ip) Run(ctx context.Context, req function.RunRequest, resp *function.Ru
 // マシンパススクレイピング用のrun
 
 func (f *machine_pass) Run(ctx context.Context, req function.RunRequest, resp *function.RunResponse) {
+	//var Machine_Data Machine_Data
+	var machine_pass string
 	var username string
 	var password string
+	var environment string
 	var machine_name string
-	var machine_pass string
 
 	// Read Terraform argument data into the variables
-	resp.Error = function.ConcatFuncErrors(resp.Error, req.Arguments.Get(ctx, &username, &password, &machine_name))
-
-	//　スクレイピングでipアドレスを抽出する
+	resp.Error = function.ConcatFuncErrors(resp.Error, req.Arguments.Get(ctx, &username, &password, &environment, &machine_name))
 	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
 	/*
-		   デバック中のためコメントアウト
-			   driver := agouti.ChromeDriver(
-				   agouti.ChromeOptions(
-					   "args", []string{
-						   "--headless",
-						   "--disavle-gpu",
-					   }),
-			   )*/
-	log.Printf("Open Google Chorome...")
+	   デバック中のためコメントアウト
+	   	driver := agouti.ChromeDriver(
+	   		agouti.ChromeOptions(
+	   			"args", []string{
+	   				"--headless",
+	   				"--disavle-gpu",
+	   			}),
+	   	)*/
+	log.Printf("Open Google Chorome...\n")
 
 	if err := driver.Start(); err != nil {
-		log.Fatalf("Failed to start driver:%v", err)
+		log.Fatalf("Failed to start driver:%v\n", err)
 	}
+
 	defer driver.Stop()
-	log.Printf("Access to FUN VM WebAPI...")
 	page, err := driver.NewPage()
 	if err != nil {
-		log.Fatalf("Failed to open page:%v", err)
-		time.Sleep(1 * time.Second)
-	} // go to login page
-	if err := page.Navigate("https://manage.p.fun.ac.jp/server_manage"); err != nil {
-		log.Fatalf("Failed to navigate:%v", err)
+		log.Fatalf("Failed to open Chorome page:%v\n", err)
 	}
-	log.Printf("Success to FUN VM WebAPI")
+	log.Printf("Success to open Google Chorome.\n")
+
+	// access to FUN login page..
+	log.Printf("Access to FUN VM WebAPI...\n")
+	if err := page.Navigate("https://manage.p.fun.ac.jp/server_manage"); err != nil {
+		log.Fatalf("Failed to access to FUN VM WebAPI:%v\n", err)
+	}
+
 	time.Sleep(1 * time.Second)
 
+	// 入力ボックスにユーザ名・パスを打ち込む
 	elem_user := page.FindByName("username")
-	log.Printf("Input username = %v", username)
-
 	elem_pass := page.FindByName("password")
-	log.Printf("Input password")
-
 	elem_user.Fill(username)
 	elem_pass.Fill(password)
-	log.Printf("login...")
+	log.Printf("fill username: %v\n", username)
+	log.Printf("fill password\n")
+
 	// Submit
 	if err := page.FindByClass("credentials_input_submit").Click(); err != nil {
-		log.Fatalf("Failed to login:%v", err)
+		log.Fatalf("Failed to login:%v\n", err)
 		return
 	}
-	log.Printf("Success to login FUN VM WebAPI!!")
+	log.Printf("Success to login FUN VM WebAPI!!\n")
 
 	time.Sleep(1 * time.Second)
-	if err := page.FindByXPath("/html/body/div/div/main/div/form/div[2]/div/span").Click(); err != nil {
-		log.Fatalf("Failed to choice:%v", err)
-		return
+
+	// 環境画面の項目数を入れる関数。暫定５個に設定しておく
+	max_environment := 5
+	for i := 1; i <= max_environment; i++ {
+
+		log.Printf("Serch for environment: %v\n...", environment)
+		text, _ := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Text()
+		if text == environment {
+
+			log.Printf("get environment: %v\n", text)
+			if err := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Click(); err != nil {
+				log.Fatalf("Failed to click environment: %v\n", err)
+			}
+			break
+		}
+		//　max_environment個分のの項目をチェックしてなかった場合エラーにする
+		if i == max_environment {
+			log.Fatalf("Can't look up environment: %v\n", environment)
+		}
 	}
 
-	for i := 0; i < 20; i++ {
-		log.Printf("serch for machin_name = %v", machine_name)
+	// 次のページへ行く
+	if err := page.FindByXPath("/html/body/div/div/main/div/form/div[2]/div/span").Click(); err != nil {
+		log.Fatalf("faild to click next page bottuon")
+	}
+
+	time.Sleep(1 * time.Second)
+
+	max_machine := 5
+	for i := 0; i <= max_machine; i++ {
+		log.Printf("serch for machin_name = %v\n", machine_name)
 		instance_name := page.FindByID("INSTANCE_NAME_" + strconv.Itoa(i))
 
 		// web上からterraformに指定されたmachine_nameと合致するものを探す
 		if text, err := instance_name.Text(); err == nil {
 			if text == machine_name {
-				log.Printf("found machin_name = %v!!!", machine_name)
+				log.Printf("found machin_name = %v!!!\n", machine_name)
 				log.Printf("start %v...", machine_name)
 				machine_pass, _ = page.FindByID("copiable-password-" + strconv.Itoa(i)).Text()
 				log.Printf("%v", machine_pass)
-
 			}
+		}
+		if max_machine == i {
+			log.Fatalf("Can't get machine_name")
 		}
 
 	}
