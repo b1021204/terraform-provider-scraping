@@ -125,7 +125,7 @@ func create_vm(Machine_Data Machine_Data) {
 				}
 				log.Printf("save new machine_name! machine_name is %v\n", name)
 
-				return
+				break
 
 			} else {
 				log.Fatalf("Failed to save machine_name;%v\n", err)

@@ -108,7 +108,7 @@ func start_vm(Machine_Data Machine_Data) {
 					return
 				}
 				log.Printf("start %v!!\n", Machine_Data.machine_name)
-				break
+				return
 			}
 
 			// マシン名が見つからなかった場合、エラーにする
