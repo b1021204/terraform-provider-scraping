@@ -96,7 +96,28 @@ func start_vm(Machine_Data Machine_Data) {
 				log.Printf("found machin_name = %v!!!", Machine_Data.machine_name)
 				log.Printf("start %v...\n", Machine_Data.machine_name)
 
+				// インスタンスネームが指定されているときに、スクレイピングする
+
+				for j := 0; j <= 4; j++ {
+					log.Printf("serch for instance_type = %v \n", Machine_Data.instance_type)
+					if Machine_Data.instance_type != "" {
+						instance, _ := page.FindByXPath("/html/body/form/div/div[4]/div[2]/div[" + strconv.Itoa(i+1) + "]/table/tbody/tr[1]/td[2]/div/select/option[" + strconv.Itoa(j) + "]").Text()
+						//	a, _ := page.FindByXPath("/html/body/form/div/div[4]/div[2]/div[3]/table/tbody/tr[1]/td[2]/div/select/option[2]").Text()
+						log.Printf("now, scraping...: %v", instance)
+						if instance == Machine_Data.instance_type {
+							if err := page.FindByXPath("/html/body/form/div/div[4]/div[2]/div[" + strconv.Itoa(i+1) + "]/table/tbody/tr[1]/td[2]/div/select/option[" + strconv.Itoa(j) + "]").Click(); err != nil {
+								log.Printf("Can't choice instance_type: %v\n", Machine_Data.instance_type)
+								log.Fatalf("Pleace choeck instance_type\n")
+								return
+							}
+
+						}
+					}
+
+				}
+
 				// 見つけたマシン名のスタートボタンをおす
+				time.Sleep(1 * time.Second)
 				if err := page.FindByName("startBtn_" + strconv.Itoa(i)).Click(); err != nil {
 					log.Fatalf("Failed to start;%v\n", err)
 					return

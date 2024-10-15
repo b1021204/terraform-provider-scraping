@@ -36,20 +36,22 @@ type VMResource struct {
 
 // 各関数内で使われるデータの構造体
 type Machine_Data struct {
-	environment  string
-	username     string
-	password     string
-	machine_name string
-	machine_stop bool
+	environment   string
+	username      string
+	password      string
+	machine_name  string
+	machine_stop  bool
+	instance_type string
 }
 
 // ExampleResourceModel describes the resource data model.
 type VMResourceModel struct {
-	Environment  types.String `tfsdk:"environment"`
-	Username     types.String `tfsdk:"username"`
-	Password     types.String `tfsdk:"password"`
-	Machine_name types.String `tfsdk:"machine_name"`
-	Machine_stop types.Bool   `tfsdk:"machine_stop"`
+	Environment   types.String `tfsdk:"environment"`
+	Username      types.String `tfsdk:"username"`
+	Password      types.String `tfsdk:"password"`
+	Machine_name  types.String `tfsdk:"machine_name"`
+	Machine_stop  types.Bool   `tfsdk:"machine_stop"`
+	Instance_Type types.String `tfsdk:"instance_type"`
 }
 
 // 　IPアドレスをスクレイピングする関数
@@ -199,6 +201,9 @@ func (r *VMResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			"machine_stop": schema.BoolAttribute{
 				Optional: true,
 			},
+			"instance_type": schema.StringAttribute{
+				Optional: true,
+			},
 		},
 	}
 }
@@ -241,6 +246,7 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 	Machine_Data.machine_name = data.Machine_name.ValueString()
 	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
 	Machine_Data.environment = data.Environment.ValueString()
+	Machine_Data.instance_type = data.Instance_Type.ValueString()
 
 	ctx = tflog.SetField(ctx, "username", Machine_Data.username)
 	ctx = tflog.SetField(ctx, "password", Machine_Data.password)
@@ -287,6 +293,7 @@ func (r *VMResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	Machine_Data.environment = data.Environment.ValueString()
 	Machine_Data.machine_name = data.Machine_name.ValueString()
 	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
+	Machine_Data.instance_type = data.Instance_Type.ValueString()
 
 	ctx = tflog.SetField(ctx, "username", Machine_Data.username)
 	ctx = tflog.SetField(ctx, "password", Machine_Data.password)
