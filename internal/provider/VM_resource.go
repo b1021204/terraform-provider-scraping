@@ -23,6 +23,7 @@ var _ resource.Resource = &VMResource{}
 var _ resource.ResourceWithImportState = &VMResource{}
 var _ function.Function = &ip{}
 var _ function.Function = &machine_pass{}
+var _ function.Function = &key{}
 
 func NewVMResource() resource.Resource {
 	return &VMResource{}
@@ -35,20 +36,22 @@ type VMResource struct {
 
 // 各関数内で使われるデータの構造体
 type Machine_Data struct {
-	environment  string
-	username     string
-	password     string
-	machine_name string
-	machine_stop bool
+	environment   string
+	username      string
+	password      string
+	machine_name  string
+	machine_stop  bool
+	instance_type string
 }
 
 // ExampleResourceModel describes the resource data model.
 type VMResourceModel struct {
-	Environment  types.String `tfsdk:"environment"`
-	Username     types.String `tfsdk:"username"`
-	Password     types.String `tfsdk:"password"`
-	Machine_name types.String `tfsdk:"machine_name"`
-	Machine_stop types.Bool   `tfsdk:"machine_stop"`
+	Environment   types.String `tfsdk:"environment"`
+	Username      types.String `tfsdk:"username"`
+	Password      types.String `tfsdk:"password"`
+	Machine_name  types.String `tfsdk:"machine_name"`
+	Machine_stop  types.Bool   `tfsdk:"machine_stop"`
+	Instance_Type types.String `tfsdk:"instance_type"`
 }
 
 // 　IPアドレスをスクレイピングする関数
@@ -57,12 +60,19 @@ type ip struct{}
 // VMのパスワードをスクレイピングする関数
 type machine_pass struct{}
 
+// VM の鍵をダウンロードし、アドレスを返す関数
+type key struct{}
+
 func NewIp() function.Function {
 	return &ip{}
 }
 
 func NewMachinePass() function.Function {
 	return &machine_pass{}
+}
+
+func NewKey() function.Function {
+	return &key{}
 }
 
 // ipアドレススクレイピング用のメタデータ
@@ -129,6 +139,38 @@ func (f *machine_pass) Definition(ctx context.Context, req function.DefinitionRe
 	}
 }
 
+// 鍵ダウンロード関数用のメタデータ
+func (f *key) Metadata(ctx context.Context, req function.MetadataRequest, resp *function.MetadataResponse) {
+	resp.Name = "key"
+}
+
+// 鍵ダウンロード関数用の定義
+func (f *key) Definition(ctx context.Context, req function.DefinitionRequest, resp *function.DefinitionResponse) {
+	resp.Definition = function.Definition{
+		Summary:     "Download ssh key and return key address",
+		Description: "Pleace give usenamae, pass, env and address you want to download.",
+		Parameters: []function.Parameter{
+			function.StringParameter{
+				Name:        "username",
+				Description: "username",
+			},
+			function.StringParameter{
+				Name:        "password",
+				Description: "pass",
+			},
+			function.StringParameter{
+				Name:        "environment",
+				Description: "env of VM",
+			},
+			function.StringParameter{
+				Name:        "address",
+				Description: "address which you want to download.",
+			},
+		},
+		Return: function.StringReturn{},
+	}
+}
+
 // resource用のメタデータ
 func (r *VMResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_resource"
@@ -157,6 +199,9 @@ func (r *VMResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			},
 
 			"machine_stop": schema.BoolAttribute{
+				Optional: true,
+			},
+			"instance_type": schema.StringAttribute{
 				Optional: true,
 			},
 		},
@@ -201,6 +246,7 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 	Machine_Data.machine_name = data.Machine_name.ValueString()
 	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
 	Machine_Data.environment = data.Environment.ValueString()
+	Machine_Data.instance_type = data.Instance_Type.ValueString()
 
 	ctx = tflog.SetField(ctx, "username", Machine_Data.username)
 	ctx = tflog.SetField(ctx, "password", Machine_Data.password)
@@ -247,6 +293,7 @@ func (r *VMResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	Machine_Data.environment = data.Environment.ValueString()
 	Machine_Data.machine_name = data.Machine_name.ValueString()
 	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
+	Machine_Data.instance_type = data.Instance_Type.ValueString()
 
 	ctx = tflog.SetField(ctx, "username", Machine_Data.username)
 	ctx = tflog.SetField(ctx, "password", Machine_Data.password)
@@ -541,5 +588,121 @@ func (f *machine_pass) Run(ctx context.Context, req function.RunRequest, resp *f
 	}
 	page.CloseWindow()
 	resp.Error = function.ConcatFuncErrors(resp.Error, resp.Result.Set(ctx, machine_pass))
+	return
+}
+
+// 鍵ダウンロード用のrun
+
+func (f *key) Run(ctx context.Context, req function.RunRequest, resp *function.RunResponse) {
+	//var Machine_Data Machine_Data
+	var username string
+	var password string
+	var environment string
+	var address string
+
+	// Read Terraform argument data into the variables
+	resp.Error = function.ConcatFuncErrors(resp.Error, req.Arguments.Get(ctx, &username, &password, &environment, &address))
+	driver := agouti.ChromeDriver(
+		// ここでChromeOptions
+		agouti.ChromeOptions("prefs", map[string]interface{}{
+			"download.default_directory":         address,
+			"download.prompt_for_download":       false,
+			"download.directory_upgrade":         true,
+			"plugins.plugins_disabled":           "Chrome PDF Viewer",
+			"plugins.always_open_pdf_externally": true,
+		}), /*
+			agouti.ChromeOptions("args", []string{
+				"--disable-extensions",
+				"--disable-print-preview",
+				"--ignore-certificate-errors",
+			}),*/
+		agouti.Debug,
+	)
+	/*
+	   デバック中のためコメントアウト
+	   	driver := agouti.ChromeDriver(
+	   		agouti.ChromeOptions(
+	   			"args", []string{
+	   				"--headless",
+	   				"--disavle-gpu",
+	   			}),
+	   	)
+	*/
+	log.Printf("Open Google Chorome...\n")
+
+	if err := driver.Start(); err != nil {
+		log.Fatalf("Failed to start driver:%v\n", err)
+	}
+
+	defer driver.Stop()
+	page, err := driver.NewPage()
+	if err != nil {
+		log.Fatalf("Failed to open Chorome page:%v\n", err)
+	}
+	log.Printf("Success to open Google Chorome.\n")
+
+	// access to FUN login page..
+	log.Printf("Access to FUN VM WebAPI...\n")
+	if err := page.Navigate("https://manage.p.fun.ac.jp/server_manage"); err != nil {
+		log.Fatalf("Failed to access to FUN VM WebAPI:%v\n", err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	// 入力ボックスにユーザ名・パスを打ち込む
+	elem_user := page.FindByName("username")
+	elem_pass := page.FindByName("password")
+	elem_user.Fill(username)
+	elem_pass.Fill(password)
+	log.Printf("fill username: %v\n", username)
+	log.Printf("fill password\n")
+
+	// Submit
+	if err := page.FindByClass("credentials_input_submit").Click(); err != nil {
+		log.Fatalf("Failed to login:%v\n", err)
+		return
+	}
+	log.Printf("Success to login FUN VM WebAPI!!\n")
+
+	time.Sleep(1 * time.Second)
+
+	// 環境画面の項目数を入れる関数。暫定５個に設定しておく
+	max_environment := 5
+	for i := 1; i <= max_environment; i++ {
+
+		log.Printf("Serch for environment: %v\n...", environment)
+		text, _ := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Text()
+		if text == environment {
+
+			log.Printf("get environment: %v\n", text)
+			if err := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Click(); err != nil {
+				log.Fatalf("Failed to click environment: %v\n", err)
+			}
+			break
+		}
+		//　max_environment個分のの項目をチェックしてなかった場合エラーにする
+		if i == max_environment {
+			log.Fatalf("Can't look up environment: %v\n", environment)
+		}
+	}
+
+	// 次のページへ行く
+	if err := page.FindByXPath("/html/body/div/div/main/div/form/div[2]/div/span").Click(); err != nil {
+		log.Fatalf("faild to click next page bottuon")
+	}
+
+	time.Sleep(1 * time.Second)
+
+	//ダウンロードボタンクリック
+	if err := page.FindByXPath("/html/body/form/div/div[4]/div[1]/div[3]/div/div[2]/div[2]/div/a").Click(); err != nil {
+		log.Fatalf("Failed to Download key:%v\n", err)
+		return
+	}
+
+	key_name, _ := page.FindByXPath("/html/body/form/div/div[4]/div[1]/div[3]/div/div[2]/div[2]/div/span").Text()
+	log.Printf("key name is %v and  address is %v/%v.pem\n", key_name, address, key_name)
+	address = address + "/" + key_name + ".pem"
+	page.CloseWindow()
+	resp.Error = function.ConcatFuncErrors(resp.Error, resp.Result.Set(ctx, address))
 	return
 }

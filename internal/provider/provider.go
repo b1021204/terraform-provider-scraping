@@ -115,6 +115,7 @@ func (p *scrapingProvider) Functions(_ context.Context) []func() function.Functi
 	return []func() function.Function{
 		NewIp,
 		NewMachinePass,
+		NewKey,
 	}
 
 }
