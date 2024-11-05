@@ -18,7 +18,7 @@ resource "scraping_resource" "example"{
     machine_name = "EC2-geotail-155163"
     machine_stop = false
     instance_type = "t4g.large"
-
+}
 
 /*
   connection {
@@ -38,11 +38,11 @@ resource "scraping_resource" "example"{
 } 
 
 
-output "ip" {
-    value = provider::scraping::ip("b1021204", "SAKURAskip108", "Linux(Ubuntu22.04LTS)(2024前期)(10/31廃止)", "EC2-geotail-146000")
-}
-
 */
+output "ip" {
+    value = scraping_resource.example.username
+    
+    
+    }
 
 
-}
