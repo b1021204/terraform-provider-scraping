@@ -14,7 +14,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/sclevine/agouti"
+	"net"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -42,6 +44,7 @@ type Machine_Data struct {
 	machine_name  string
 	machine_stop  bool
 	instance_type string
+	ip            string
 }
 
 // ExampleResourceModel describes the resource data model.
@@ -52,6 +55,7 @@ type VMResourceModel struct {
 	Machine_name  types.String `tfsdk:"machine_name"`
 	Machine_stop  types.Bool   `tfsdk:"machine_stop"`
 	Instance_Type types.String `tfsdk:"instance_type"`
+	Ip            types.String `tfsdk:"ip"`
 }
 
 // 　IPアドレスをスクレイピングする関数
@@ -247,6 +251,7 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
 	Machine_Data.environment = data.Environment.ValueString()
 	Machine_Data.instance_type = data.Instance_Type.ValueString()
+	Machine_Data.ip = "ikerude"
 
 	ctx = tflog.SetField(ctx, "username", Machine_Data.username)
 	ctx = tflog.SetField(ctx, "password", Machine_Data.password)
@@ -456,6 +461,29 @@ func (f *ip) Run(ctx context.Context, req function.RunRequest, resp *function.Ru
 
 	time.Sleep(1 * time.Second)
 
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// ipアドレスを精査して,学内アドレスかグローバルIPアドレスかを判別
+
+	var univ_ip bool
+	for _, addr := range addrs {
+		ip_text := addr.String()
+		if strings.Index(ip_text, "10.") == 0 {
+			univ_ip = true
+			break
+		}
+		univ_ip = false
+	}
+	if univ_ip {
+		log.Println("You use univ wifi like fun-wifi or free-wifi")
+	} else {
+		log.Println("You don't use univ wifi")
+	}
+
 	max_machine := 5
 	for i := 0; i <= max_machine; i++ {
 		log.Printf("serch for machin_name = %v", machine_name)
@@ -466,7 +494,12 @@ func (f *ip) Run(ctx context.Context, req function.RunRequest, resp *function.Ru
 			if text == machine_name {
 				log.Printf("found machin_name = %v!!!", machine_name)
 				log.Printf("start %v...", machine_name)
-				ip, _ = page.FindByID("copiable-ip_address-" + strconv.Itoa(i)).Text()
+				if univ_ip {
+					ip, _ = page.FindByID("copiable-ip_address-" + strconv.Itoa(i)).Text()
+				} else {
+					ip, _ = page.FindByID("copiable-public_ip_address-" + strconv.Itoa(i)).Text()
+					log.Println(ip + "\n\n")
+				}
 				log.Printf("%v", ip)
 				break
 			}
