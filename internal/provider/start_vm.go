@@ -1,14 +1,17 @@
 package provider
 
 import (
-	//"fmt"
+	"fmt"
 	"github.com/sclevine/agouti"
 	"log"
+	"net"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
-func start_vm(Machine_Data Machine_Data) {
+func start_vm(Machine_Data *Machine_Data) {
 
 	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
 	/*
@@ -110,7 +113,7 @@ func start_vm(Machine_Data Machine_Data) {
 								log.Fatalf("Pleace choeck instance_type\n")
 								return
 							}
-
+							break
 						}
 					}
 
@@ -129,7 +132,7 @@ func start_vm(Machine_Data Machine_Data) {
 					return
 				}
 				log.Printf("start %v!!\n", Machine_Data.machine_name)
-				return
+
 			}
 
 			// マシン名が見つからなかった場合、エラーにする
@@ -139,6 +142,61 @@ func start_vm(Machine_Data Machine_Data) {
 			}
 		}
 	}
+
+	time.Sleep(1 * time.Second)
+
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// ipアドレスを精査して,学内アドレスかグローバルIPアドレスかを判別
+
+	var univ_ip bool
+	for _, addr := range addrs {
+		ip_text := addr.String()
+		if strings.Index(ip_text, "10.") == 0 {
+			univ_ip = true
+			break
+		}
+		univ_ip = false
+	}
+	if univ_ip {
+		log.Printf("You use univ wifi like fun-wifi or free-wifi\n")
+	} else {
+		log.Printf("You don't use univ wifi\n")
+	}
+
+	max_machine = 5
+	for i := 0; i <= max_machine; i++ {
+		log.Printf("serch for machin_name = %v\n", Machine_Data.machine_name)
+		instance_name := page.FindByID("INSTANCE_NAME_" + strconv.Itoa(i))
+
+		// web上からterraformに指定されたmachine_nameと合致するものを探す
+		if text, err := instance_name.Text(); err == nil {
+			if text == Machine_Data.machine_name {
+
+				//machine_passをスクレイピングする
+				log.Printf("found machin_name = %v!!!\n", Machine_Data.machine_name)
+				log.Printf("scraping %v...", Machine_Data.machine_name)
+				Machine_Data.machine_pass, _ = page.FindByID("copiable-password-" + strconv.Itoa(i)).Text()
+				log.Printf("%v", Machine_Data.machine_pass)
+				if univ_ip {
+					Machine_Data.ip, _ = page.FindByID("copiable-ip_address-" + strconv.Itoa(i)).Text()
+				} else {
+					Machine_Data.ip, _ = page.FindByID("copiable-public_ip_address-" + strconv.Itoa(i)).Text()
+					log.Println(Machine_Data.ip + "\n\n")
+				}
+				log.Printf("%v", Machine_Data.ip)
+				break
+			}
+		}
+		if max_machine == i {
+			log.Fatalf("Can't get machine_name")
+		}
+	}
+
 	page.CloseWindow()
 
 }

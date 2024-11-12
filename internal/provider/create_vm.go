@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func create_vm(Machine_Data Machine_Data) {
+func create_vm(Machine_Data *Machine_Data) {
 
 	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
 	/*
@@ -110,6 +110,7 @@ func create_vm(Machine_Data Machine_Data) {
 
 			if err == nil {
 				log.Printf("machine_name = %v", name)
+				Machine_Data.machine_name = name
 
 				f, err := os.Create(".machine_name.txt")
 				if err != nil {
@@ -123,6 +124,7 @@ func create_vm(Machine_Data Machine_Data) {
 				if err != nil {
 					log.Fatal(err)
 				}
+
 				log.Printf("save new machine_name! machine_name is %v\n", name)
 
 				break

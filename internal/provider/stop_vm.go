@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func stop_vm(Machine_Data Machine_Data) {
+func stop_vm(Machine_Data *Machine_Data) {
 
 	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
 	/*

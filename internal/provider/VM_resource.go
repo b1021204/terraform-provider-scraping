@@ -45,6 +45,7 @@ type Machine_Data struct {
 	machine_stop  bool
 	instance_type string
 	ip            string
+	machine_pass  string
 }
 
 // ExampleResourceModel describes the resource data model.
@@ -54,8 +55,9 @@ type VMResourceModel struct {
 	Password      types.String `tfsdk:"password"`
 	Machine_name  types.String `tfsdk:"machine_name"`
 	Machine_stop  types.Bool   `tfsdk:"machine_stop"`
-	Instance_Type types.String `tfsdk:"instance_type"`
+	Instance_type types.String `tfsdk:"instance_type"`
 	Ip            types.String `tfsdk:"ip"`
+	Machine_pass  types.String `tfsdk:"machine_pass"`
 }
 
 // 　IPアドレスをスクレイピングする関数
@@ -200,13 +202,21 @@ func (r *VMResource) Schema(ctx context.Context, req resource.SchemaRequest, res
 			},
 			"machine_name": schema.StringAttribute{
 				Optional: true,
+				Computed: true,
 			},
-
 			"machine_stop": schema.BoolAttribute{
 				Optional: true,
 			},
 			"instance_type": schema.StringAttribute{
 				Optional: true,
+			},
+			"ip": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+			},
+			"machine_pass": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
 			},
 		},
 	}
@@ -250,8 +260,9 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 	Machine_Data.machine_name = data.Machine_name.ValueString()
 	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
 	Machine_Data.environment = data.Environment.ValueString()
-	Machine_Data.instance_type = data.Instance_Type.ValueString()
-	Machine_Data.ip = "ikerude"
+	Machine_Data.instance_type = data.Instance_type.ValueString()
+	Machine_Data.ip = data.Ip.ValueString()
+	Machine_Data.machine_pass = data.Machine_pass.ValueString()
 
 	ctx = tflog.SetField(ctx, "username", Machine_Data.username)
 	ctx = tflog.SetField(ctx, "password", Machine_Data.password)
@@ -259,26 +270,27 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 	if Machine_Data.machine_name == "" {
 		// マシン名が指定されていない時、新規でVMを立ち上げる
 		log.Printf("machine_name is null." +
-			"We will create new machine. If you want to stand-up machine which already created, you should put name in machine_name")
+			"We will create new machine. If you want to stand-up machine which already created, you should put name in machine_name\n")
 	} else {
 		ctx = tflog.SetField(ctx, "machine_name", Machine_Data.machine_name)
 	}
 	if Machine_Data.machine_name == "" {
 		// machine名が入力されてなければ作成
-		create_vm(Machine_Data)
+		create_vm(&Machine_Data)
 	} else {
 
 		if Machine_Data.machine_stop {
-			stop_vm(Machine_Data)
+			stop_vm(&Machine_Data)
 
 		} else {
-			log.Printf("already start VM.")
-			start_vm(Machine_Data)
+			log.Printf("already start VM.\n")
+			start_vm(&Machine_Data)
 		}
 
 	}
-
-	log.Printf("Compleate!!!")
+	data.Ip = types.StringValue(Machine_Data.ip)
+	data.Machine_pass = types.StringValue(Machine_Data.machine_pass)
+	log.Printf("Compleate!!!\n")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 
 }
@@ -298,34 +310,39 @@ func (r *VMResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	Machine_Data.environment = data.Environment.ValueString()
 	Machine_Data.machine_name = data.Machine_name.ValueString()
 	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
-	Machine_Data.instance_type = data.Instance_Type.ValueString()
+	Machine_Data.instance_type = data.Instance_type.ValueString()
+	Machine_Data.ip = data.Ip.ValueString()
+	Machine_Data.machine_pass = data.Machine_pass.ValueString()
 
 	ctx = tflog.SetField(ctx, "username", Machine_Data.username)
 	ctx = tflog.SetField(ctx, "password", Machine_Data.password)
 
 	if Machine_Data.machine_name == "" {
 		log.Printf("machine_name is null." +
-			"We will create new machine. If you want to stand-up machine which already created, you should put name in machine_name")
+			"We will create new machine. If you want to stand-up machine which already created, you should put name in machine_name\n")
 	} else {
-		ctx = tflog.SetField(ctx, "machine_name", Machine_Data.machine_name)
+		ctx = tflog.SetField(ctx, "machine_name\n", Machine_Data.machine_name)
 	}
 	// machine名が入力されていれば起動、なければ作成
 	if Machine_Data.machine_name == "" {
-		log.Printf("Now, create new vm machine...")
-		create_vm(Machine_Data)
+		log.Printf("Now, create new vm machine...\n")
+		create_vm(&Machine_Data)
 	} else {
 
 		if Machine_Data.machine_stop {
-			log.Printf("Now, %v is stoping...", Machine_Data.machine_name)
-			stop_vm(Machine_Data)
+			log.Printf("Now, %v is stoping...\n", Machine_Data.machine_name)
+			stop_vm(&Machine_Data)
 		} else {
-			log.Printf("Now, %v is starting...", Machine_Data.machine_name)
-			start_vm(Machine_Data)
+			log.Printf("Now, %v is starting...\n", Machine_Data.machine_name)
+			start_vm(&Machine_Data)
+
 		}
 
 	}
 
-	log.Printf("Compleate!!!")
+	data.Ip = types.StringValue(Machine_Data.ip)
+	data.Machine_pass = types.StringValue(Machine_Data.machine_pass)
+	log.Printf("Compleate!!!\n")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -359,10 +376,8 @@ func (r *VMResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 		}
 
 		Machine_Data.machine_name = string(buf[:n])
-		log.Printf("%s", Machine_Data.machine_name)
-		//delete_vm(username, password, machine_name)
-
 	}
+	log.Printf("%s", Machine_Data.machine_name)
 	log.Printf("Deleating: %s...\n", Machine_Data.machine_name)
 
 	delete_vm(Machine_Data)
