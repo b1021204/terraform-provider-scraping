@@ -277,6 +277,7 @@ func (r *VMResource) Create(ctx context.Context, req resource.CreateRequest, res
 	if Machine_Data.machine_name == "" {
 		// machine名が入力されてなければ作成
 		create_vm(&Machine_Data)
+		data.Machine_name = types.StringValue(Machine_Data.machine_name)
 	} else {
 
 		if Machine_Data.machine_stop {
@@ -327,6 +328,7 @@ func (r *VMResource) Update(ctx context.Context, req resource.UpdateRequest, res
 	if Machine_Data.machine_name == "" {
 		log.Printf("Now, create new vm machine...\n")
 		create_vm(&Machine_Data)
+		data.Machine_name = types.StringValue(Machine_Data.machine_name)
 	} else {
 
 		if Machine_Data.machine_stop {
@@ -361,22 +363,24 @@ func (r *VMResource) Delete(ctx context.Context, req resource.DeleteRequest, res
 	Machine_Data.environment = data.Environment.ValueString()
 	Machine_Data.machine_name = data.Machine_name.ValueString()
 	Machine_Data.machine_stop = data.Machine_stop.ValueBool()
+	/*
+	   machinedattaが空欄になることはないよう設計のためコメントアウト
+	   	if Machine_Data.machine_name == "" {
+	   		f, err := os.Open(".machine_name.txt")
+	   		if err != nil {
+	   			fmt.Println("Can't get machine_name. You should confirm the file which named \".machine_name.txt\" .")
+	   		}
+	   		defer f.Close()
 
-	if Machine_Data.machine_name == "" {
-		f, err := os.Open(".machine_name.txt")
-		if err != nil {
-			fmt.Println("Can't get machine_name. You should confirm the file which named \".machine_name.txt\" .")
-		}
-		defer f.Close()
+	   		buf := make([]byte, 1024)
+	   		n, err := f.Read(buf)
+	   		if err != nil {
+	   			fmt.Printf("error! You should confirm the file which named \".machine_name.txt\" .")
+	   		}
 
-		buf := make([]byte, 1024)
-		n, err := f.Read(buf)
-		if err != nil {
-			fmt.Printf("error! You should confirm the file which named \".machine_name.txt\" .")
-		}
-
-		Machine_Data.machine_name = string(buf[:n])
-	}
+	   		Machine_Data.machine_name = string(buf[:n])
+	   	}
+	*/
 	log.Printf("%s", Machine_Data.machine_name)
 	log.Printf("Deleating: %s...\n", Machine_Data.machine_name)
 
@@ -650,107 +654,115 @@ func (f *key) Run(ctx context.Context, req function.RunRequest, resp *function.R
 
 	// Read Terraform argument data into the variables
 	resp.Error = function.ConcatFuncErrors(resp.Error, req.Arguments.Get(ctx, &username, &password, &environment, &address))
-	driver := agouti.ChromeDriver(
-		// ここでChromeOptions
-		agouti.ChromeOptions("prefs", map[string]interface{}{
-			"download.default_directory":         address,
-			"download.prompt_for_download":       false,
-			"download.directory_upgrade":         true,
-			"plugins.plugins_disabled":           "Chrome PDF Viewer",
-			"plugins.always_open_pdf_externally": true,
-		}), /*
+	// キーが存在しているか確認
+	filename := address + "/" + "funawskey" + username + ".pem"
+	log.Printf("\n%v\n\n", filename)
+	if _, err := os.Stat(filename); err == nil {
+		log.Printf("Already, you have %v!! \n", filename)
+		address := filename
+		resp.Error = function.ConcatFuncErrors(resp.Error, resp.Result.Set(ctx, address))
+		return
+	} else {
+		log.Printf("Now, Download key.\n")
+
+		driver := agouti.ChromeDriver(
+			// ここでChromeOptions
+			agouti.ChromeOptions("prefs", map[string]interface{}{
+				"download.default_directory":         address,
+				"download.prompt_for_download":       false,
+				"download.directory_upgrade":         true,
+				"plugins.plugins_disabled":           "Chrome PDF Viewer",
+				"plugins.always_open_pdf_externally": true,
+			}),
 			agouti.ChromeOptions("args", []string{
-				"--disable-extensions",
-				"--disable-print-preview",
-				"--ignore-certificate-errors",
-			}),*/
-		agouti.Debug,
-	)
-	/*
-	   デバック中のためコメントアウト
-	   	driver := agouti.ChromeDriver(
-	   		agouti.ChromeOptions(
-	   			"args", []string{
-	   				"--headless",
-	   				"--disavle-gpu",
-	   			}),
-	   	)
-	*/
-	log.Printf("Open Google Chorome...\n")
+				"--headless",
+				"--disavle-gpu",
+			}),
+			/*
+				agouti.ChromeOptions("args", []string{
+					"--disable-extensions",
+					"--disable-print-preview",
+					"--ignore-certificate-errors",
+				}),*/
+			agouti.Debug,
+		)
 
-	if err := driver.Start(); err != nil {
-		log.Fatalf("Failed to start driver:%v\n", err)
-	}
+		log.Printf("Open Google Chorome...\n")
 
-	defer driver.Stop()
-	page, err := driver.NewPage()
-	if err != nil {
-		log.Fatalf("Failed to open Chorome page:%v\n", err)
-	}
-	log.Printf("Success to open Google Chorome.\n")
+		if err := driver.Start(); err != nil {
+			log.Fatalf("Failed to start driver:%v\n", err)
+		}
 
-	// access to FUN login page..
-	log.Printf("Access to FUN VM WebAPI...\n")
-	if err := page.Navigate("https://manage.p.fun.ac.jp/server_manage"); err != nil {
-		log.Fatalf("Failed to access to FUN VM WebAPI:%v\n", err)
-	}
+		defer driver.Stop()
+		page, err := driver.NewPage()
+		if err != nil {
+			log.Fatalf("Failed to open Chorome page:%v\n", err)
+		}
+		log.Printf("Success to open Google Chorome.\n")
 
-	time.Sleep(1 * time.Second)
+		// access to FUN login page..
+		log.Printf("Access to FUN VM WebAPI...\n")
+		if err := page.Navigate("https://manage.p.fun.ac.jp/server_manage"); err != nil {
+			log.Fatalf("Failed to access to FUN VM WebAPI:%v\n", err)
+		}
 
-	// 入力ボックスにユーザ名・パスを打ち込む
-	elem_user := page.FindByName("username")
-	elem_pass := page.FindByName("password")
-	elem_user.Fill(username)
-	elem_pass.Fill(password)
-	log.Printf("fill username: %v\n", username)
-	log.Printf("fill password\n")
+		time.Sleep(1 * time.Second)
 
-	// Submit
-	if err := page.FindByClass("credentials_input_submit").Click(); err != nil {
-		log.Fatalf("Failed to login:%v\n", err)
-		return
-	}
-	log.Printf("Success to login FUN VM WebAPI!!\n")
+		// 入力ボックスにユーザ名・パスを打ち込む
+		elem_user := page.FindByName("username")
+		elem_pass := page.FindByName("password")
+		elem_user.Fill(username)
+		elem_pass.Fill(password)
+		log.Printf("fill username: %v\n", username)
+		log.Printf("fill password\n")
 
-	time.Sleep(1 * time.Second)
+		// Submit
+		if err := page.FindByClass("credentials_input_submit").Click(); err != nil {
+			log.Fatalf("Failed to login:%v\n", err)
+			return
+		}
+		log.Printf("Success to login FUN VM WebAPI!!\n")
 
-	// 環境画面の項目数を入れる関数。暫定５個に設定しておく
-	max_environment := 5
-	for i := 1; i <= max_environment; i++ {
+		time.Sleep(1 * time.Second)
 
-		log.Printf("Serch for environment: %v\n...", environment)
-		text, _ := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Text()
-		if text == environment {
+		// 環境画面の項目数を入れる関数。暫定５個に設定しておく
+		max_environment := 5
+		for i := 1; i <= max_environment; i++ {
 
-			log.Printf("get environment: %v\n", text)
-			if err := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Click(); err != nil {
-				log.Fatalf("Failed to click environment: %v\n", err)
+			log.Printf("Serch for environment: %v\n...", environment)
+			text, _ := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Text()
+			if text == environment {
+
+				log.Printf("get environment: %v\n", text)
+				if err := page.FindByXPath("/html/body/div/div/main/div/form/div[1]/div/select/option[" + strconv.Itoa(i) + "]").Click(); err != nil {
+					log.Fatalf("Failed to click environment: %v\n", err)
+				}
+				break
 			}
-			break
+			//　max_environment個分のの項目をチェックしてなかった場合エラーにする
+			if i == max_environment {
+				log.Fatalf("Can't look up environment: %v\n", environment)
+			}
 		}
-		//　max_environment個分のの項目をチェックしてなかった場合エラーにする
-		if i == max_environment {
-			log.Fatalf("Can't look up environment: %v\n", environment)
+
+		// 次のページへ行く
+		if err := page.FindByXPath("/html/body/div/div/main/div/form/div[2]/div/span").Click(); err != nil {
+			log.Fatalf("faild to click next page bottuon")
 		}
+
+		time.Sleep(1 * time.Second)
+
+		//ダウンロードボタンクリック
+		if err := page.FindByXPath("/html/body/form/div/div[4]/div[1]/div[3]/div/div[2]/div[2]/div/a").Click(); err != nil {
+			log.Fatalf("Failed to Download key:%v\n", err)
+			return
+		}
+
+		key_name, _ := page.FindByXPath("/html/body/form/div/div[4]/div[1]/div[3]/div/div[2]/div[2]/div/span").Text()
+		log.Printf("key name is %v and  address is %v/%v.pem\n", key_name, address, key_name)
+		address = address + "/" + key_name + ".pem"
+		page.CloseWindow()
 	}
-
-	// 次のページへ行く
-	if err := page.FindByXPath("/html/body/div/div/main/div/form/div[2]/div/span").Click(); err != nil {
-		log.Fatalf("faild to click next page bottuon")
-	}
-
-	time.Sleep(1 * time.Second)
-
-	//ダウンロードボタンクリック
-	if err := page.FindByXPath("/html/body/form/div/div[4]/div[1]/div[3]/div/div[2]/div[2]/div/a").Click(); err != nil {
-		log.Fatalf("Failed to Download key:%v\n", err)
-		return
-	}
-
-	key_name, _ := page.FindByXPath("/html/body/form/div/div[4]/div[1]/div[3]/div/div[2]/div[2]/div/span").Text()
-	log.Printf("key name is %v and  address is %v/%v.pem\n", key_name, address, key_name)
-	address = address + "/" + key_name + ".pem"
-	page.CloseWindow()
 	resp.Error = function.ConcatFuncErrors(resp.Error, resp.Result.Set(ctx, address))
 	return
 }

@@ -13,16 +13,15 @@ import (
 
 func start_vm(Machine_Data *Machine_Data) {
 
-	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
-	/*
-	   デバック中のためコメントアウト
-	   	driver := agouti.ChromeDriver(
-	   		agouti.ChromeOptions(
-	   			"args", []string{
-	   				"--headless",
-	   				"--disavle-gpu",
-	   			}),
-	   	)*/
+	//	driver := agouti.ChromeDriver(agouti.Browser("chrome"))
+
+	driver := agouti.ChromeDriver(
+		agouti.ChromeOptions(
+			"args", []string{
+				"--headless",
+				"--disavle-gpu",
+			}),
+	)
 	log.Printf("Open Google Chorome...\n")
 
 	if err := driver.Start(); err != nil {
@@ -99,14 +98,14 @@ func start_vm(Machine_Data *Machine_Data) {
 				log.Printf("found machin_name = %v!!!", Machine_Data.machine_name)
 				log.Printf("start %v...\n", Machine_Data.machine_name)
 
-				// インスタンスネームが指定されているときに、スクレイピングする
+				// インスタンスタイプが指定されているときに、スクレイピングする
 
 				for j := 0; j <= 4; j++ {
 					log.Printf("serch for instance_type = %v \n", Machine_Data.instance_type)
 					if Machine_Data.instance_type != "" {
 						instance, _ := page.FindByXPath("/html/body/form/div/div[4]/div[2]/div[" + strconv.Itoa(i+1) + "]/table/tbody/tr[1]/td[2]/div/select/option[" + strconv.Itoa(j) + "]").Text()
 						//	a, _ := page.FindByXPath("/html/body/form/div/div[4]/div[2]/div[3]/table/tbody/tr[1]/td[2]/div/select/option[2]").Text()
-						log.Printf("now, scraping...: %v", instance)
+						log.Printf("now, scraping...: %v\n", instance)
 						if instance == Machine_Data.instance_type {
 							if err := page.FindByXPath("/html/body/form/div/div[4]/div[2]/div[" + strconv.Itoa(i+1) + "]/table/tbody/tr[1]/td[2]/div/select/option[" + strconv.Itoa(j) + "]").Click(); err != nil {
 								log.Printf("Can't choice instance_type: %v\n", Machine_Data.instance_type)
