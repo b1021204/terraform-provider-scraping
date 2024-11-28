@@ -154,7 +154,6 @@ func create_vm(Machine_Data *Machine_Data) {
 
 		} else {
 			log.Printf("Can't find :%v\n", name)
-
 		}
 
 	}
