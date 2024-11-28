@@ -153,8 +153,8 @@ func create_vm(Machine_Data *Machine_Data) {
 			break
 
 		} else {
-			log.Fatalf("Failed to save machine_name;%v\n", err)
-			return
+			log.Printf("Can't find :%v\n", name)
+
 		}
 
 	}
@@ -194,14 +194,19 @@ func create_vm(Machine_Data *Machine_Data) {
 				log.Printf("found machin_name = %v!!!\n", Machine_Data.machine_name)
 				log.Printf("scraping %v...", Machine_Data.machine_name)
 				Machine_Data.machine_pass, _ = page.FindByID("copiable-password-" + strconv.Itoa(i)).Text()
-				log.Printf("%v", Machine_Data.machine_pass)
+				log.Printf("machine pass = %v", Machine_Data.machine_pass)
 				if univ_ip {
 					Machine_Data.ip, _ = page.FindByID("copiable-ip_address-" + strconv.Itoa(i)).Text()
+
+					log.Printf("machine's ip is %v\n", Machine_Data.ip)
+
 				} else {
 					Machine_Data.ip, _ = page.FindByID("copiable-public_ip_address-" + strconv.Itoa(i)).Text()
-					log.Println(Machine_Data.ip + "\n\n")
+
+					log.Printf("machine's ip is %v\n", Machine_Data.ip)
+
 				}
-				log.Printf("%v", Machine_Data.ip)
+				//og.Printf("%v", Machine_Data.ip)
 				break
 			}
 		}
